@@ -47,7 +47,7 @@ function App() {
     return () => {
       networkService.disconnect();
     };
-  }
+  }, []);
   )
 
   const handleNameChange = (newName: string) => {

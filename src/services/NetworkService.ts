@@ -191,14 +191,20 @@ export class NetworkService {
     }
     
     // Notify others that we're going offline
-    if (this.localUser) {
-      this.broadcastChannel.postMessage({
-        type: 'user-offline',
-        userId: this.localUser.id,
-        timestamp: Date.now()
-      });
+    if (this.localUser && this.broadcastChannel) {
+      try {
+        this.broadcastChannel.postMessage({
+          type: 'user-offline',
+          userId: this.localUser.id,
+          timestamp: Date.now()
+        });
+      } catch (error) {
+        // Channel might already be closed, ignore the error
+      }
     }
     
-    this.broadcastChannel.close();
+    if (this.broadcastChannel) {
+      this.broadcastChannel.close();
+    }
   }
 }
