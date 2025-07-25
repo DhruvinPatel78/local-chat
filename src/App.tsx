@@ -48,7 +48,6 @@ function App() {
       networkService.disconnect();
     };
   }, []);
-  )
 
   const handleNameChange = (newName: string) => {
     networkService.updateUserName(newName);
