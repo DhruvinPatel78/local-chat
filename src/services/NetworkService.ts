@@ -3,7 +3,7 @@ export class NetworkService {
   private onlineDevices: Map<string, any> = new Map();
   private messageCallbacks: ((message: any) => void)[] = [];
   private deviceUpdateCallbacks: ((devices: any[]) => void)[] = [];
-  private broadcastChannel: BroadcastChannel | null = null;
+  private broadcastChannel: BroadcastChannel;
   private heartbeatInterval: NodeJS.Timeout | null = null;
 
   constructor() {
@@ -31,8 +31,6 @@ export class NetworkService {
   }
 
   private setupBroadcastListener() {
-    if (!this.broadcastChannel) return;
-    
     this.broadcastChannel.onmessage = (event) => {
       const data = event.data;
       
@@ -88,7 +86,7 @@ export class NetworkService {
   }
 
   private sendHeartbeat() {
-    if (this.localUser && this.broadcastChannel) {
+    if (this.localUser) {
       this.broadcastChannel.postMessage({
         type: 'heartbeat',
         userId: this.localUser.id,
@@ -125,7 +123,7 @@ export class NetworkService {
   }
 
   updateUserName(name: string) {
-    if (this.localUser && this.broadcastChannel) {
+    if (this.localUser) {
       this.localUser.name = name;
       localStorage.setItem('localUser', JSON.stringify(this.localUser));
       
@@ -140,7 +138,7 @@ export class NetworkService {
   }
 
   sendMessage(content: string): any {
-    if (!this.localUser || !this.broadcastChannel) return null;
+    if (!this.localUser) return null;
     
     const messageData = {
       type: 'message',
@@ -157,7 +155,7 @@ export class NetworkService {
   }
 
   sendFile(file: File): any {
-    if (!this.localUser || !this.broadcastChannel) return null;
+    if (!this.localUser) return null;
     
     const fileData = {
       type: 'message',
@@ -188,33 +186,19 @@ export class NetworkService {
   }
 
   disconnect() {
-    // Prevent multiple disconnect calls
-    if (!this.broadcastChannel) return;
-    
     if (this.heartbeatInterval) {
       clearInterval(this.heartbeatInterval);
-      this.heartbeatInterval = null;
     }
     
     // Notify others that we're going offline
-    if (this.localUser && this.broadcastChannel) {
-      try {
-        this.broadcastChannel.postMessage({
-          type: 'user-offline',
-          userId: this.localUser.id,
-          timestamp: Date.now()
-        });
-      } catch (error) {
-        // Channel might already be closed, ignore the error
-      }
+    if (this.localUser) {
+      this.broadcastChannel.postMessage({
+        type: 'user-offline',
+        userId: this.localUser.id,
+        timestamp: Date.now()
+      });
     }
     
-    try {
-      this.broadcastChannel.close();
-    } catch (error) {
-      // Channel might already be closed, ignore the error
-    }
-    
-    this.broadcastChannel = null;
+    this.broadcastChannel.close();
   }
 }
