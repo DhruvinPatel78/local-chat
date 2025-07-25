@@ -3,14 +3,19 @@ export class NetworkService {
   private onlineDevices: Map<string, any> = new Map();
   private messageCallbacks: ((message: any) => void)[] = [];
   private deviceUpdateCallbacks: ((devices: any[]) => void)[] = [];
-  private broadcastChannel: BroadcastChannel;
+  private broadcastChannel: BroadcastChannel | null = null;
   private heartbeatInterval: NodeJS.Timeout | null = null;
 
   constructor() {
     this.initializeLocalUser();
-    this.broadcastChannel = new BroadcastChannel('local-network-chat');
-    this.setupBroadcastListener();
-    this.startHeartbeat();
+  }
+
+  start() {
+    if (!this.broadcastChannel) {
+      this.broadcastChannel = new BroadcastChannel('local-network-chat');
+      this.setupBroadcastListener();
+      this.startHeartbeat();
+    }
   }
 
   private initializeLocalUser() {
@@ -87,12 +92,18 @@ export class NetworkService {
 
   private sendHeartbeat() {
     if (this.localUser) {
-      this.broadcastChannel.postMessage({
-        type: 'heartbeat',
-        userId: this.localUser.id,
-        userName: this.localUser.name,
-        timestamp: Date.now()
-      });
+      try {
+        this.broadcastChannel?.postMessage({
+          type: 'heartbeat',
+          userId: this.localUser.id,
+          userName: this.localUser.name,
+          timestamp: Date.now()
+        });
+      } catch (error) {
+        if (error instanceof DOMException && error.name === 'InvalidStateError') {
+          this.disconnect();
+        }
+      }
     }
   }
 
@@ -128,12 +139,18 @@ export class NetworkService {
       localStorage.setItem('localUser', JSON.stringify(this.localUser));
       
       // Broadcast name change
-      this.broadcastChannel.postMessage({
-        type: 'user-update',
-        userId: this.localUser.id,
-        userName: name,
-        timestamp: Date.now()
-      });
+      try {
+        this.broadcastChannel?.postMessage({
+          type: 'user-update',
+          userId: this.localUser.id,
+          userName: name,
+          timestamp: Date.now()
+        });
+      } catch (error) {
+        if (error instanceof DOMException && error.name === 'InvalidStateError') {
+          this.disconnect();
+        }
+      }
     }
   }
 
@@ -150,7 +167,13 @@ export class NetworkService {
       messageType: 'text'
     };
 
-    this.broadcastChannel.postMessage(messageData);
+    try {
+      this.broadcastChannel?.postMessage(messageData);
+    } catch (error) {
+      if (error instanceof DOMException && error.name === 'InvalidStateError') {
+        this.disconnect();
+      }
+    }
     return messageData;
   }
 
@@ -169,7 +192,13 @@ export class NetworkService {
       fileSize: file.size
     };
 
-    this.broadcastChannel.postMessage(fileData);
+    try {
+      this.broadcastChannel?.postMessage(fileData);
+    } catch (error) {
+      if (error instanceof DOMException && error.name === 'InvalidStateError') {
+        this.disconnect();
+      }
+    }
     return fileData;
   }
 
@@ -188,17 +217,25 @@ export class NetworkService {
   disconnect() {
     if (this.heartbeatInterval) {
       clearInterval(this.heartbeatInterval);
+      this.heartbeatInterval = null;
     }
     
     // Notify others that we're going offline
-    if (this.localUser) {
-      this.broadcastChannel.postMessage({
-        type: 'user-offline',
-        userId: this.localUser.id,
-        timestamp: Date.now()
-      });
+    if (this.localUser && this.broadcastChannel) {
+      try {
+        this.broadcastChannel.postMessage({
+          type: 'user-offline',
+          userId: this.localUser.id,
+          timestamp: Date.now()
+        });
+      } catch (error) {
+        // Channel might already be closed, ignore the error
+      }
     }
     
-    this.broadcastChannel.close();
+    if (this.broadcastChannel) {
+      this.broadcastChannel.close();
+      this.broadcastChannel = null;
+    }
   }
 }
