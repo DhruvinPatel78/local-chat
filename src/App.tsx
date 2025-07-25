@@ -20,6 +20,9 @@ function App() {
   const [messages, setMessages] = useState<Message[]>([]);
 
   useEffect(() => {
+    // Start the network service
+    networkService.start();
+    
     // Setup network service event listeners
     networkService.onMessage((data) => {
       if (data.type === 'message') {
