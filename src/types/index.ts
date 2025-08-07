@@ -14,6 +14,7 @@ export interface Message {
   type: 'text' | 'file';
   fileName?: string;
   fileSize?: number;
+  receiverId?: string | null;
 }
 
 export interface OnlineDevice {

@@ -36,8 +36,8 @@ export const UserProfile: React.FC<UserProfileProps> = ({
   };
 
   return (
-    <div className="bg-white/10 backdrop-blur-md rounded-2xl p-6 border border-white/20">
-      <div className="flex items-center justify-between mb-4">
+    <div className="bg-white/10 backdrop-blur-md rounded-t-2xl md:rounded-tl-2xl md:rounded-t-none p-6 border border-white/20">
+      <div className="flex items-center justify-between">
         <div className="flex items-center space-x-3">
           <div className="w-12 h-12 bg-blue-500 rounded-full flex items-center justify-center">
             <User className="w-6 h-6 text-white" />
@@ -85,7 +85,7 @@ export const UserProfile: React.FC<UserProfileProps> = ({
                 )}
               </div>
               <span className="text-sm text-white/80">
-                {onlineDevices > 0 ? `Online (${onlineDevices} devices nearby)` : 'No devices nearby'}
+                {onlineDevices > 0 ? `Online (${onlineDevices} devices)` : 'No devices nearby'}
               </span>
             </div>
           </div>

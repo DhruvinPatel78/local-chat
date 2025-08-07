@@ -1,19 +1,30 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { Send, Paperclip, Download, File } from 'lucide-react';
+import { Send, Paperclip, Download, File, ArrowLeft } from 'lucide-react';
 import { Message } from '../types';
+
+interface OnlineDevice {
+  id: string;
+  name: string;
+  lastSeen: number;
+  isOnline: boolean;
+}
 
 interface ChatAreaProps {
   messages: Message[];
   onSendMessage: (message: string) => void;
   onSendFile: (file: File) => void;
   currentUserId: string;
+  selectedDevice?: OnlineDevice | null;
+  onBack?: () => void; // <-- Add this prop
 }
 
 export const ChatArea: React.FC<ChatAreaProps> = ({
   messages,
   onSendMessage,
   onSendFile,
-  currentUserId
+  currentUserId,
+  selectedDevice,
+  onBack
 }) => {
   const [inputMessage, setInputMessage] = useState('');
   const [isDragging, setIsDragging] = useState(false);
@@ -48,7 +59,6 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
   const handleDrop = (e: React.DragEvent) => {
     e.preventDefault();
     setIsDragging(false);
-    
     const file = e.dataTransfer.files[0];
     if (file) {
       onSendFile(file);
@@ -74,16 +84,42 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
   };
 
   const formatTime = (timestamp: number) => {
-    return new Date(timestamp).toLocaleTimeString([], { 
-      hour: '2-digit', 
-      minute: '2-digit' 
+    return new Date(timestamp).toLocaleTimeString([], {
+      hour: '2-digit',
+      minute: '2-digit'
     });
   };
 
+  if (!selectedDevice) {
+    return (
+      <div className="flex-1 flex items-center justify-center text-white/60 text-lg">
+        Select a device to start chatting
+      </div>
+    );
+  }
+
   return (
     <div className="bg-white/10 backdrop-blur-md rounded-2xl border border-white/20 flex flex-col h-full">
+      {/* Chat Header */}
+      <div className="p-4 border-b border-white/10 flex items-center space-x-3">
+        {onBack && (
+          <button
+            className="mr-2 p-1 rounded-full hover:bg-white/20 focus:outline-none"
+            onClick={onBack}
+          >
+            <ArrowLeft className="w-6 h-6 text-blue-400" />
+          </button>
+        )}
+        <div className="w-10 h-10 bg-blue-500/20 rounded-full flex items-center justify-center">
+          <File className="w-5 h-5 text-blue-400" />
+        </div>
+        <div>
+          <p className="text-white font-medium text-lg">{selectedDevice.name}</p>
+          <span className="text-xs text-green-400">Online</span>
+        </div>
+      </div>
       {/* Messages Area */}
-      <div 
+      <div
         className={`flex-1 p-6 overflow-y-auto space-y-4 ${isDragging ? 'bg-blue-500/10' : ''}`}
         onDrop={handleDrop}
         onDragOver={handleDragOver}
@@ -97,14 +133,13 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
             </div>
           </div>
         )}
-
         {messages.length === 0 ? (
           <div className="text-center py-12">
             <div className="w-16 h-16 bg-white/10 rounded-full flex items-center justify-center mx-auto mb-4">
               <Send className="w-8 h-8 text-white/40" />
             </div>
             <p className="text-white/60 text-lg">No messages yet</p>
-            <p className="text-white/40 text-sm mt-1">Start a conversation with online devices</p>
+            <p className="text-white/40 text-sm mt-1">Start a conversation with {selectedDevice.name}</p>
           </div>
         ) : (
           messages.map((message) => (
@@ -122,7 +157,6 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
                 {message.senderId !== currentUserId && (
                   <p className="text-xs opacity-70 mb-1">{message.senderName}</p>
                 )}
-                
                 {message.type === 'text' ? (
                   <p className="break-words">{message.content}</p>
                 ) : (
@@ -137,7 +171,6 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
                     </button>
                   </div>
                 )}
-                
                 <p className="text-xs opacity-70 mt-1">{formatTime(message.timestamp)}</p>
               </div>
             </div>
@@ -145,7 +178,6 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
         )}
         <div ref={messagesEndRef} />
       </div>
-
       {/* Input Area */}
       <div className="p-4 border-t border-white/10">
         <div className="flex items-end space-x-2">
@@ -155,25 +187,22 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
             onChange={handleFileSelect}
             className="hidden"
           />
-          
           <button
             onClick={() => fileInputRef.current?.click()}
             className="p-2 hover:bg-white/20 rounded-xl transition-colors"
           >
             <Paperclip className="w-5 h-5 text-white/70 hover:text-white" />
           </button>
-          
           <div className="flex-1">
             <textarea
               value={inputMessage}
               onChange={(e) => setInputMessage(e.target.value)}
               onKeyDown={handleKeyPress}
-              placeholder="Type a message..."
+              placeholder={`Type a message to ${selectedDevice.name}...`}
               className="w-full bg-white/10 border border-white/20 rounded-xl px-4 py-2 text-white placeholder-white/50 focus:outline-none focus:ring-2 focus:ring-blue-400 resize-none max-h-32"
               rows={1}
             />
           </div>
-          
           <button
             onClick={handleSend}
             disabled={!inputMessage.trim()}
