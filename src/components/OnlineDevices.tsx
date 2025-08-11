@@ -13,9 +13,12 @@ interface OnlineDevicesProps {
   currentUserId: string;
   selectedDeviceId?: string | null;
   onSelectDevice?: (id: string) => void;
+  unreadCounts?: { [deviceId: string]: number };
 }
 
-export const OnlineDevices: React.FC<OnlineDevicesProps> = ({ devices, currentUserId, selectedDeviceId, onSelectDevice }) => {
+export const OnlineDevices: React.FC<OnlineDevicesProps> = ({ devices, currentUserId, selectedDeviceId, onSelectDevice, unreadCounts = {} }) => {
+  console.log('OnlineDevices render - devices:', devices, 'currentUserId:', currentUserId);
+  
   const formatLastSeen = (timestamp: number) => {
     const seconds = Math.floor((Date.now() - timestamp) / 1000);
     if (seconds < 60) return 'Just now';
@@ -27,6 +30,7 @@ export const OnlineDevices: React.FC<OnlineDevicesProps> = ({ devices, currentUs
 
   // Filter out the current user except for the broadcast option
   const filteredDevices = devices.filter(device => device.id !== currentUserId || device.id === '__broadcast__');
+  console.log('Filtered devices:', filteredDevices);
 
   return (
     <div>
@@ -39,35 +43,43 @@ export const OnlineDevices: React.FC<OnlineDevicesProps> = ({ devices, currentUs
           </p>
         </div>
       ) : (
-        <div className="space-y-1">
-          {filteredDevices.map((device) => (
-            <div
-              key={device.id}
-              className={`flex items-center justify-between p-3 rounded-b-xl md:rounded-b-none border border-white/10 cursor-pointer transition-colors ${selectedDeviceId === device.id ? 'bg-blue-500/30 border-blue-400' : 'bg-white/5 hover:bg-white/10'}`}
-              onClick={() => onSelectDevice && onSelectDevice(device.id)}
-            >
-              <div className="flex items-center space-x-3">
-                {device.id === '__broadcast__' ? (
-                  <div className="w-10 h-10 bg-green-500/20 rounded-full flex items-center justify-center">
-                    <Users className="w-5 h-5 text-green-400" />
-                  </div>
-                ) : (
-                  <div className="w-10 h-10 bg-blue-500/20 rounded-full flex items-center justify-center">
-                    <Smartphone className="w-5 h-5 text-blue-400" />
-                  </div>
-                )}
-                <div>
-                  <p className="text-white font-medium">{device.name}</p>
-                  {device.id !== '__broadcast__' && (
-                    <div className="flex items-center space-x-1 text-green-400">
-                      <Circle className="w-2 h-2 fill-current" />
-                      <span className="text-sm">Online • {formatLastSeen(device.lastSeen)}</span>
+        <div className="">
+          {filteredDevices.map((device, index) => {
+            const unreadCount = unreadCounts[device.id] || 0;
+            return (
+              <div
+                key={device.id}
+                className={`flex items-center justify-between p-3 ${filteredDevices.length - 1 === index ? 'rounded-b-xl' : 'rounded-none'}  md:rounded-b-none border border-white/10 cursor-pointer transition-colors ${selectedDeviceId === device.id ? 'bg-blue-500/30 border-blue-400' : 'bg-white/5 hover:bg-white/10'}`}
+                onClick={() => onSelectDevice && onSelectDevice(device.id)}
+              >
+                <div className="flex items-center space-x-3">
+                  {device.id === '__broadcast__' ? (
+                    <div className="w-10 h-10 bg-green-500/20 rounded-full flex items-center justify-center">
+                      <Users className="w-5 h-5 text-green-400" />
+                    </div>
+                  ) : (
+                    <div className="w-10 h-10 bg-blue-500/20 rounded-full flex items-center justify-center">
+                      <Smartphone className="w-5 h-5 text-blue-400" />
                     </div>
                   )}
+                  <div className="flex-1">
+                    <div className="flex items-center space-x-2">
+                      <p className="text-white font-medium">{device.name}</p>
+                      {unreadCount > 0 && device.id !== '__broadcast__' && (
+                        <div className="w-3 h-3 rounded-full bg-green-400 animate-ping" />
+                      )}
+                    </div>
+                    {device.id !== '__broadcast__' && (
+                      <div className="flex items-center space-x-1 text-green-400">
+                        <Circle className="w-2 h-2 fill-current" />
+                        <span className="text-sm">Online • {formatLastSeen(device.lastSeen)}</span>
+                      </div>
+                    )}
+                  </div>
                 </div>
               </div>
-            </div>
-          ))}
+            );
+          })}
         </div>
       )}
     </div>

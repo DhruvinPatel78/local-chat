@@ -15,6 +15,8 @@ export interface Message {
   fileName?: string;
   fileSize?: number;
   receiverId?: string | null;
+  isRead?: boolean;
+  readAt?: number;
 }
 
 export interface OnlineDevice {

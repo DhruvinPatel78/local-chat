@@ -22,6 +22,33 @@ function App() {
   const [showChatOnMobile, setShowChatOnMobile] = useState(false);
   const BROADCAST_ID = '__broadcast__';
 
+  // Calculate unread message counts for each device
+  const unreadCounts = React.useMemo(() => {
+    const counts: { [deviceId: string]: number } = {};
+    
+    if (!currentUser) return counts;
+    
+    // Peer-to-peer unread counts
+    onlineDevices.forEach(device => {
+      if (device.id !== currentUser.id) {
+        const unreadCount = messages.filter(message => 
+          message.senderId === device.id && 
+          message.receiverId === currentUser.id && 
+          !message.isRead
+        ).length;
+        counts[device.id] = unreadCount;
+      }
+    });
+    
+    // Broadcast unread count
+    const broadcastUnread = messages.filter(
+      message => message.receiverId === null && message.senderId !== currentUser.id && !message.isRead
+    ).length;
+    counts[BROADCAST_ID] = broadcastUnread;
+    
+    return counts;
+  }, [messages, onlineDevices, currentUser]);
+
   useEffect(() => {
     const handleResize = () => {
       setIsMobile(window.innerWidth < 768);
@@ -32,9 +59,24 @@ function App() {
   }, []);
 
   useEffect(() => {
+    console.log('App useEffect running - setting up network service');
+    
     networkService.start();
-    networkService.onMessage((data) => {
+    
+    // Store callback references to prevent duplicates
+    const messageCallback = (data: any) => {
       if (data.type === 'message') {
+        console.log('Received message from network service:', data);
+        
+        // Skip if this is our own message (we already added it when sending)
+        if (data.senderId === currentUser!.id) {
+          console.log('Skipping own message from server:', data.id);
+          return;
+        }
+        
+        // Determine if this is a peer-to-peer message or broadcast
+        const isPeerToPeer = data.receiverId !== null && data.receiverId !== undefined;
+        
         const message: Message = {
           id: data.id,
           senderId: data.senderId,
@@ -43,19 +85,103 @@ function App() {
           timestamp: data.timestamp,
           type: data.messageType === 'file' ? 'file' : 'text',
           fileName: data.fileName,
-          fileSize: data.fileSize
+          fileSize: data.fileSize,
+          receiverId: isPeerToPeer ? data.receiverId : null, // Set receiverId for peer-to-peer messages
         };
-        setMessages(prev => [...prev, message]);
+        
+        console.log('Processed message:', message);
+        
+        // Prevent duplicate messages by checking if message ID already exists
+        setMessages(prev => {
+          const messageExists = prev.some(m => m.id === message.id);
+          if (messageExists) {
+            console.log('Message already exists, skipping duplicate:', message.id);
+            return prev;
+          }
+          console.log('Adding new message:', message.id);
+          return [...prev, message];
+        });
+      } else if (data.type === 'read-receipt') {
+        console.log('Received read receipt:', data);
+        console.log('Current user ID:', currentUser!.id);
+        console.log('Looking for message with ID:', data.messageId);
+        
+        // Find the message that should be updated
+        const messageToUpdate = messages.find(message => 
+          message.id === data.messageId && 
+          message.senderId === currentUser!.id && 
+          message.receiverId === data.senderId
+        );
+        
+        console.log('Message to update:', messageToUpdate);
+        
+        // Update message read status for messages sent by current user
+        // data.senderId = who read the message (Chrome), data.originalSenderId = who sent the original message (Safari)
+        // We need to find messages sent by current user (Safari) to the person who read it (Chrome)
+        setMessages(prev => {
+          const updatedMessages = prev.map(message => {
+            if (message.id === data.messageId && 
+                message.senderId === currentUser!.id && 
+                message.receiverId === data.senderId) {
+              console.log('Updating message to read:', message.id, message.content);
+              return { ...message, isRead: true, readAt: data.timestamp };
+            }
+            return message;
+          });
+          
+          console.log('Messages after read receipt update:', updatedMessages);
+          return updatedMessages;
+        });
       }
-    });
-    networkService.onDeviceUpdate((devices) => {
-      setOnlineDevices(devices);
-    });
-    setOnlineDevices(networkService.getOnlineDevices());
+    };
+    
+    const deviceUpdateCallback = (devices: any[]) => {
+      console.log('Device update received in App:', devices);
+      // Only update if we have devices, don't clear on empty arrays
+      if (devices && devices.length > 0) {
+        setOnlineDevices(devices);
+      } else {
+        console.log('Received empty devices array, keeping current devices');
+      }
+    };
+    
+    // Register callbacks
+    networkService.onMessage(messageCallback);
+    networkService.onDeviceUpdate(deviceUpdateCallback);
+    
+    const initialDevices = networkService.getOnlineDevices();
+    console.log('Initial devices from network service:', initialDevices);
+    if (initialDevices && initialDevices.length > 0) {
+      setOnlineDevices(initialDevices);
+    }
+    
+    // Periodic refresh of online devices (only if we have devices)
+    const interval = setInterval(() => {
+      const currentDevices = networkService.getOnlineDevices();
+      console.log('Periodic device refresh:', currentDevices);
+      if (currentDevices && currentDevices.length > 0) {
+        setOnlineDevices(currentDevices);
+      }
+    }, 5000); // Refresh every 5 seconds
+    
     return () => {
+      console.log('App useEffect cleanup - cleaning up network service');
+      clearInterval(interval);
       networkService.disconnect();
     };
   }, []);
+
+  // Automatically mark messages as read when they're viewed in the chat
+  useEffect(() => {
+    if (selectedDeviceId && selectedDeviceId !== BROADCAST_ID) {
+      // Small delay to ensure the chat is fully loaded
+      const timer = setTimeout(() => {
+        markMessagesAsRead(selectedDeviceId);
+      }, 500);
+      
+      return () => clearTimeout(timer);
+    }
+  }, [selectedDeviceId, messages]);
 
   const handleNameChange = (newName: string) => {
     networkService.updateUserName(newName);
@@ -68,12 +194,12 @@ function App() {
       if (!messageData) return;
       const newMessage: Message = {
         id: messageData.id,
-        senderId: messageData.senderId || currentUser!.id,
-        senderName: messageData.senderName || currentUser!.name,
+        senderId: messageData.senderId,
+        senderName: messageData.senderName,
         content: messageData.content,
         timestamp: messageData.timestamp,
         type: 'text',
-        receiverId: null,
+        receiverId: messageData.receiverId,
       };
       setMessages(prev => [...prev, newMessage]);
       return;
@@ -82,12 +208,12 @@ function App() {
     if (!messageData) return;
     const newMessage: Message = {
       id: messageData.id,
-      senderId: messageData.senderId || currentUser!.id,
-      senderName: messageData.senderName || currentUser!.name,
+      senderId: messageData.senderId,
+      senderName: messageData.senderName,
       content: messageData.content,
       timestamp: messageData.timestamp,
       type: 'text',
-      receiverId: selectedDeviceId,
+      receiverId: messageData.receiverId,
     };
     setMessages(prev => [...prev, newMessage]);
   };
@@ -96,13 +222,32 @@ function App() {
     return;
   };
 
-  const filteredMessages = selectedDeviceId && selectedDeviceId !== BROADCAST_ID
+  const filteredMessages = selectedDeviceId && selectedDeviceId !== BROADCAST_ID && currentUser
     ? messages.filter(
-        m =>
-          ((m.senderId === currentUser!.id && m.receiverId === selectedDeviceId) ||
-          (m.senderId === selectedDeviceId && m.receiverId === currentUser!.id))
+        m => {
+          const isMatch = ((m.senderId === currentUser.id && m.receiverId === selectedDeviceId) ||
+          (m.senderId === selectedDeviceId && m.receiverId === currentUser.id));
+          
+          console.log('Filtering message:', {
+            message: m,
+            selectedDeviceId,
+            currentUserId: currentUser.id,
+            isMatch,
+            senderId: m.senderId,
+            receiverId: m.receiverId,
+            isRead: m.isRead,
+            readAt: m.readAt
+          });
+          
+          return isMatch;
+        }
       )
     : messages.filter(m => m.receiverId === null);
+
+  // Force re-render when messages are updated with read status
+  useEffect(() => {
+    console.log('Messages updated, filtered messages:', filteredMessages);
+  }, [messages, filteredMessages]);
 
   const deviceList = onlineDevices;
   const deviceListWithBroadcast = [
@@ -114,11 +259,62 @@ function App() {
   const handleSelectDevice = (id: string) => {
     setSelectedDeviceId(id);
     if (isMobile) setShowChatOnMobile(true);
+    
+    // Mark messages from this device as read and send read receipts
+    if (id !== BROADCAST_ID && currentUser) {
+      const unreadMessages = messages.filter(message => 
+        message.senderId === id && message.receiverId === currentUser.id && !message.isRead
+      );
+      
+      if (unreadMessages.length > 0) {
+        setMessages(prev => prev.map(message => 
+          message.senderId === id && message.receiverId === currentUser.id && !message.isRead
+            ? { ...message, isRead: true, readAt: Date.now() }
+            : message
+        ));
+        
+        // Send read receipts for all unread messages
+        unreadMessages.forEach(message => {
+          networkService.sendReadReceipt(message.id, id);
+        });
+      }
+    }
+  };
+
+  // Function to mark messages as read when they're viewed
+  const markMessagesAsRead = (deviceId: string) => {
+    if (deviceId === BROADCAST_ID || !currentUser) return;
+    
+    const unreadMessages = messages.filter(message => 
+      message.senderId === deviceId && message.receiverId === currentUser.id && !message.isRead
+    );
+    
+    if (unreadMessages.length > 0) {
+      setMessages(prev => prev.map(message => 
+        message.senderId === deviceId && message.receiverId === currentUser.id && !message.isRead
+          ? { ...message, isRead: true, readAt: Date.now() }
+          : message
+      ));
+      
+      // Send read receipts for all unread messages
+      unreadMessages.forEach(message => {
+        networkService.sendReadReceipt(message.id, deviceId);
+      });
+    }
   };
   const handleBackToList = () => {
     setShowChatOnMobile(false);
     setSelectedDeviceId(null);
   };
+
+  // Don't render if currentUser is not available
+  if (!currentUser) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-blue-900 via-purple-900 to-indigo-900 flex items-center justify-center">
+        <div className="text-white text-lg">Loading user...</div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-900 via-purple-900 to-indigo-900">
@@ -139,6 +335,7 @@ function App() {
                   currentUserId={currentUser.id}
                   selectedDeviceId={selectedDeviceId}
                   onSelectDevice={handleSelectDevice}
+                  unreadCounts={unreadCounts}
                 />
               </div>
             </div>
@@ -158,6 +355,18 @@ function App() {
                       : deviceList.find(d => d.id === selectedDeviceId) || null
                   }
                   onBack={isMobile ? handleBackToList : undefined}
+                  onMessageViewed={(messageId) => {
+                    // Find the message and mark it as read if it's from the selected device
+                    if (selectedDeviceId && selectedDeviceId !== BROADCAST_ID) {
+                      const message = messages.find(m => m.id === messageId);
+                      if (message && message.senderId === selectedDeviceId && message.receiverId === currentUser.id && !message.isRead) {
+                        setMessages(prev => prev.map(m => 
+                          m.id === messageId ? { ...m, isRead: true, readAt: Date.now() } : m
+                        ));
+                        networkService.sendReadReceipt(messageId, selectedDeviceId);
+                      }
+                    }
+                  }}
                 />
               ) : (
                 <div className="flex-1 flex items-center justify-center text-white/60 text-lg">

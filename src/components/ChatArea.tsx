@@ -16,6 +16,7 @@ interface ChatAreaProps {
   currentUserId: string;
   selectedDevice?: OnlineDevice | null;
   onBack?: () => void; // <-- Add this prop
+  onMessageViewed?: (messageId: string) => void; // Add this prop for read receipts
 }
 
 export const ChatArea: React.FC<ChatAreaProps> = ({
@@ -24,12 +25,41 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
   onSendFile,
   currentUserId,
   selectedDevice,
-  onBack
+  onBack,
+  onMessageViewed
 }) => {
   const [inputMessage, setInputMessage] = useState('');
   const [isDragging, setIsDragging] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  // Intersection Observer to mark messages as read when they come into view
+  const messageRefs = useRef<{ [key: string]: HTMLDivElement | null }>({});
+
+  useEffect(() => {
+    if (!onMessageViewed) return;
+
+    const observer = new IntersectionObserver(
+      (entries) => {
+        entries.forEach((entry) => {
+          if (entry.isIntersecting) {
+            const messageId = entry.target.getAttribute('data-message-id');
+            if (messageId) {
+              onMessageViewed(messageId);
+            }
+          }
+        });
+      },
+      { threshold: 0.5 } // Trigger when 50% of message is visible
+    );
+
+    // Observe all message elements
+    Object.values(messageRefs.current).forEach((ref) => {
+      if (ref) observer.observe(ref);
+    });
+
+    return () => observer.disconnect();
+  }, [messages, onMessageViewed]);
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -146,6 +176,8 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
             <div
               key={message.id}
               className={`flex ${message.senderId === currentUserId ? 'justify-end' : 'justify-start'}`}
+              ref={(el) => (messageRefs.current[message.id] = el)}
+              data-message-id={message.id}
             >
               <div
                 className={`max-w-xs lg:max-w-md px-4 py-2 rounded-2xl ${
@@ -172,6 +204,20 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
                   </div>
                 )}
                 <p className="text-xs opacity-70 mt-1">{formatTime(message.timestamp)}</p>
+                {/* Read receipt for sent messages */}
+                {false && message.senderId === currentUserId && message.receiverId && (
+                  <div className="flex items-center justify-end mt-1">
+                    {message.isRead ? (
+                      <div className="flex items-center space-x-1 text-xs opacity-70">
+                        <span>Read</span>
+                        <span>•</span>
+                        <span>{message.readAt ? formatTime(message.readAt) : ''}</span>
+                      </div>
+                    ) : (
+                      <div className="text-xs opacity-50">Delivered</div>
+                    )}
+                  </div>
+                )}
               </div>
             </div>
           ))
@@ -180,7 +226,7 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
       </div>
       {/* Input Area */}
       <div className="p-4 border-t border-white/10">
-        <div className="flex items-end space-x-2">
+        <div className="flex items-center space-x-2">
           <input
             type="file"
             ref={fileInputRef}
@@ -193,7 +239,7 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
           >
             <Paperclip className="w-5 h-5 text-white/70 hover:text-white" />
           </button>
-          <div className="flex-1">
+          <div className="flex-1 flex items-center justify-center">
             <textarea
               value={inputMessage}
               onChange={(e) => setInputMessage(e.target.value)}

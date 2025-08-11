@@ -1,0 +1,51 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>WebSocket Test</title>
+</head>
+<body>
+    <h1>WebSocket Test</h1>
+    <div id="status">Connecting...</div>
+    <div id="devices">No devices</div>
+    
+    <script>
+        const ws = new WebSocket('ws://localhost:3001');
+        const statusDiv = document.getElementById('status');
+        const devicesDiv = document.getElementById('devices');
+        
+        ws.onopen = function() {
+            statusDiv.textContent = 'Connected!';
+            console.log('WebSocket connected');
+            
+            // Send init message
+            ws.send(JSON.stringify({
+                type: 'init',
+                id: 'test-user-' + Date.now(),
+                name: 'Test User'
+            }));
+        };
+        
+        ws.onmessage = function(event) {
+            const data = JSON.parse(event.data);
+            console.log('Received:', data);
+            
+            if (data.type === 'online-devices') {
+                devicesDiv.innerHTML = '<h3>Online Devices:</h3>' + 
+                    data.devices.map(device => 
+                        `<div>${device.name} (${device.id}) - ${device.isOnline ? 'Online' : 'Offline'}</div>`
+                    ).join('');
+            }
+        };
+        
+        ws.onerror = function(error) {
+            statusDiv.textContent = 'Error: ' + error;
+            console.error('WebSocket error:', error);
+        };
+        
+        ws.onclose = function() {
+            statusDiv.textContent = 'Disconnected';
+            console.log('WebSocket disconnected');
+        };
+    </script>
+</body>
+</html>
