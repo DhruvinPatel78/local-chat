@@ -16,8 +16,8 @@ export class NetworkService {
 
   start() {
     if (!this.ws) {
-      console.log('Starting WebSocket connection to ws://local-chat-be.onrender.com:3001');
-      this.ws = new WebSocket('ws://local-chat-be.onrender.com:3001');
+      console.log('Starting WebSocket connection to wss://local-chat-be.onrender.com:3001');
+      this.ws = new WebSocket('wss://local-chat-be.onrender.com:3001');
 
       this.ws.onopen = () => {
         console.log('WebSocket connected successfully');
