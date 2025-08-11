@@ -16,9 +16,9 @@ export class NetworkService {
 
   start() {
     if (!this.ws) {
-      console.log('Starting WebSocket connection to ws://localhost:3001');
-      this.ws = new WebSocket('ws://localhost:3001');
-      
+      console.log('Starting WebSocket connection to ws://local-chat-be.onrender.com:3001');
+      this.ws = new WebSocket('ws://local-chat-be.onrender.com:3001');
+
       this.ws.onopen = () => {
         console.log('WebSocket connected successfully');
         this.isConnected = true;
@@ -31,7 +31,7 @@ export class NetworkService {
           this.pendingNameUpdate = null;
         }
       };
-      
+
       this.ws.onmessage = (event) => {
         const data = JSON.parse(event.data);
         console.log('Received from server:', data);
@@ -56,12 +56,12 @@ export class NetworkService {
             break;
         }
       };
-      
+
       this.ws.onclose = () => {
         console.log('WebSocket connection closed');
         this.isConnected = false;
         this.ws = null;
-        
+
         // Try to reconnect if we haven't exceeded max attempts
         if (this.reconnectAttempts < this.maxReconnectAttempts) {
           this.reconnectAttempts++;
@@ -74,7 +74,7 @@ export class NetworkService {
           console.error('Max reconnection attempts reached');
         }
       };
-      
+
       this.ws.onerror = (error) => {
         console.error('WebSocket error:', error);
       };
@@ -137,10 +137,10 @@ export class NetworkService {
 
   sendMessage(content: string, receiverId?: string): any {
     if (!this.localUser || !this.ws || this.ws.readyState !== WebSocket.OPEN) return null;
-    
+
     const messageId = this.generateId();
     const timestamp = Date.now();
-    
+
     const messageData: any = {
       type: 'message',
       content,
@@ -149,14 +149,14 @@ export class NetworkService {
       senderId: this.localUser.id,
       senderName: this.localUser.name,
     };
-    
+
     if (receiverId) {
       messageData.receiverId = receiverId;
     }
-    
+
     console.log('Sending message:', messageData);
     this.ws.send(JSON.stringify(messageData));
-    
+
     // Return properly structured message data for the frontend
     return {
       id: messageId,
@@ -170,7 +170,7 @@ export class NetworkService {
 
   sendReadReceipt(messageId: string, receiverId: string): void {
     if (!this.localUser || !this.ws || this.ws.readyState !== WebSocket.OPEN) return;
-    
+
     const readReceipt = {
       type: 'read-receipt',
       messageId: messageId,
@@ -178,7 +178,7 @@ export class NetworkService {
       receiverId: receiverId,
       timestamp: Date.now(),
     };
-    
+
     console.log('Sending read receipt:', readReceipt);
     this.ws.send(JSON.stringify(readReceipt));
   }
