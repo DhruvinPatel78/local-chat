@@ -12,6 +12,7 @@ export class NetworkService {
   constructor() {
     this.initializeLocalUser();
     console.log('NetworkService initialized with user:', this.localUser);
+    this.setupUnloadHandlers();
   }
 
   start() {
@@ -38,17 +39,15 @@ export class NetworkService {
         switch (data.type) {
           case 'online-devices':
             console.log('Received online devices update:', data.devices);
-            // Only update if we have devices, don't clear on empty arrays
-            if (data.devices && data.devices.length > 0) {
-              this.onlineDevices.clear();
+            // Always update devices (including empty) so offline state is reflected immediately
+            this.onlineDevices.clear();
+            if (Array.isArray(data.devices)) {
               data.devices.forEach((device: any) => {
                 this.onlineDevices.set(device.id, device);
               });
-              console.log('Updated online devices map:', Array.from(this.onlineDevices.values()));
-              this.notifyDeviceUpdate();
-            } else {
-              console.log('Received empty devices array, keeping current devices');
             }
+            console.log('Updated online devices map:', Array.from(this.onlineDevices.values()));
+            this.notifyDeviceUpdate();
             break;
           case 'message':
             console.log('NetworkService received message:', data);
@@ -79,6 +78,18 @@ export class NetworkService {
         console.error('WebSocket error:', error);
       };
     }
+  }
+
+  private setupUnloadHandlers() {
+    const closeWs = () => {
+      try {
+        this.ws?.close();
+      } catch (e) {
+        // ignore
+      }
+    };
+    window.addEventListener('beforeunload', closeWs);
+    window.addEventListener('pagehide', closeWs);
   }
 
   private sendInit() {

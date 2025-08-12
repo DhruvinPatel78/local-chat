@@ -137,12 +137,8 @@ function App() {
     
     const deviceUpdateCallback = (devices: any[]) => {
       console.log('Device update received in App:', devices);
-      // Only update if we have devices, don't clear on empty arrays
-      if (devices && devices.length > 0) {
-        setOnlineDevices(devices);
-      } else {
-        console.log('Received empty devices array, keeping current devices');
-      }
+      // Always apply updates to reflect disconnects immediately
+      setOnlineDevices(Array.isArray(devices) ? devices : []);
     };
     
     // Register callbacks
@@ -151,17 +147,13 @@ function App() {
     
     const initialDevices = networkService.getOnlineDevices();
     console.log('Initial devices from network service:', initialDevices);
-    if (initialDevices && initialDevices.length > 0) {
-      setOnlineDevices(initialDevices);
-    }
+    setOnlineDevices(initialDevices ?? []);
     
-    // Periodic refresh of online devices (only if we have devices)
+    // Periodic refresh of online devices
     const interval = setInterval(() => {
       const currentDevices = networkService.getOnlineDevices();
       console.log('Periodic device refresh:', currentDevices);
-      if (currentDevices && currentDevices.length > 0) {
-        setOnlineDevices(currentDevices);
-      }
+      setOnlineDevices(currentDevices ?? []);
     }, 5000); // Refresh every 5 seconds
     
     return () => {
