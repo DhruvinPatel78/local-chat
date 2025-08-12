@@ -1,51 +1,103 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>WebSocket Test</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 20px; }
+        .log { background: #f0f0f0; padding: 10px; margin: 10px 0; border-radius: 5px; }
+        .error { color: red; }
+        .success { color: green; }
+        button { padding: 10px 20px; margin: 5px; }
+    </style>
 </head>
 <body>
-    <h1>WebSocket Test</h1>
-    <div id="status">Connecting...</div>
-    <div id="devices">No devices</div>
+    <h1>WebSocket Connection Test</h1>
+    <button onclick="connect()">Connect</button>
+    <button onclick="disconnect()">Disconnect</button>
+    <button onclick="sendTest()">Send Test Message</button>
+    <button onclick="clearLog()">Clear Log</button>
+    
+    <div id="log"></div>
 
     <script>
-        const ws = new WebSocket('wss://local-chat-be.onrender.com:3001');
-        const statusDiv = document.getElementById('status');
-        const devicesDiv = document.getElementById('devices');
+        let ws = null;
+        const logDiv = document.getElementById('log');
 
-        ws.onopen = function() {
-            statusDiv.textContent = 'Connected!';
-            console.log('WebSocket connected');
+        function log(message, type = 'info') {
+            const div = document.createElement('div');
+            div.className = `log ${type}`;
+            div.textContent = `${new Date().toLocaleTimeString()}: ${message}`;
+            logDiv.appendChild(div);
+            logDiv.scrollTop = logDiv.scrollHeight;
+        }
 
-            // Send init message
-            ws.send(JSON.stringify({
-                type: 'init',
-                id: 'test-user-' + Date.now(),
-                name: 'Test User'
-            }));
-        };
+        function clearLog() {
+            logDiv.innerHTML = '';
+        }
 
-        ws.onmessage = function(event) {
-            const data = JSON.parse(event.data);
-            console.log('Received:', data);
-
-            if (data.type === 'online-devices') {
-                devicesDiv.innerHTML = '<h3>Online Devices:</h3>' +
-                    data.devices.map(device =>
-                        `<div>${device.name} (${device.id}) - ${device.isOnline ? 'Online' : 'Offline'}</div>`
-                    ).join('');
+        function connect() {
+            if (ws && ws.readyState === WebSocket.OPEN) {
+                log('Already connected', 'error');
+                return;
             }
-        };
 
-        ws.onerror = function(error) {
-            statusDiv.textContent = 'Error: ' + error;
-            console.error('WebSocket error:', error);
-        };
+            log('Attempting to connect to wss://local-chat-be.onrender.com...');
+            ws = new WebSocket('wss://local-chat-be.onrender.com');
 
-        ws.onclose = function() {
-            statusDiv.textContent = 'Disconnected';
-            console.log('WebSocket disconnected');
-        };
+            ws.onopen = () => {
+                log('WebSocket connected successfully!', 'success');
+                // Send init message
+                const initMessage = {
+                    type: 'init',
+                    id: 'test-' + Date.now(),
+                    name: 'Test User'
+                };
+                ws.send(JSON.stringify(initMessage));
+                log('Sent init message: ' + JSON.stringify(initMessage));
+            };
+
+            ws.onmessage = (event) => {
+                try {
+                    const data = JSON.parse(event.data);
+                    log('Received: ' + JSON.stringify(data, null, 2), 'success');
+                } catch (e) {
+                    log('Received non-JSON message: ' + event.data);
+                }
+            };
+
+            ws.onclose = (event) => {
+                log(`WebSocket closed: ${event.code} - ${event.reason}`, 'error');
+            };
+
+            ws.onerror = (error) => {
+                log('WebSocket error: ' + error, 'error');
+            };
+        }
+
+        function disconnect() {
+            if (ws) {
+                ws.close();
+                ws = null;
+                log('Disconnected');
+            }
+        }
+
+        function sendTest() {
+            if (!ws || ws.readyState !== WebSocket.OPEN) {
+                log('Not connected', 'error');
+                return;
+            }
+
+            const testMessage = {
+                type: 'message',
+                content: 'Hello from test client!',
+                receiverId: null // broadcast
+            };
+            ws.send(JSON.stringify(testMessage));
+            log('Sent test message: ' + JSON.stringify(testMessage));
+        }
     </script>
 </body>
 </html>

@@ -20,7 +20,7 @@ export class NetworkService {
       this.ws = new WebSocket('wss://local-chat-be.onrender.com');
 
       this.ws.onopen = () => {
-        console.log('WebSocket connected successfully');
+        console.log('WebSocket connected successfully to wss://local-chat-be.onrender.com');
         this.isConnected = true;
         this.reconnectAttempts = 0;
         // Always send id and name on connect
@@ -57,8 +57,8 @@ export class NetworkService {
         }
       };
 
-      this.ws.onclose = () => {
-        console.log('WebSocket connection closed');
+      this.ws.onclose = (event) => {
+        console.log('WebSocket connection closed', event.code, event.reason);
         this.isConnected = false;
         this.ws = null;
 
