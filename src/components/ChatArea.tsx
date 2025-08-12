@@ -1,6 +1,7 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { Send, Paperclip, Download, File, ArrowLeft } from 'lucide-react';
 import { Message } from '../types';
+import { config, getFileDownloadUrl } from '../config';
 
 interface OnlineDevice {
   id: string;
@@ -15,8 +16,8 @@ interface ChatAreaProps {
   onSendFile: (file: File) => void;
   currentUserId: string;
   selectedDevice?: OnlineDevice | null;
-  onBack?: () => void; // <-- Add this prop
-  onMessageViewed?: (messageId: string) => void; // Add this prop for read receipts
+  onBack?: () => void;
+  onMessageViewed?: (messageId: string) => void;
 }
 
 export const ChatArea: React.FC<ChatAreaProps> = ({
@@ -30,6 +31,7 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
 }) => {
   const [inputMessage, setInputMessage] = useState('');
   const [isDragging, setIsDragging] = useState(false);
+  const [isUploading, setIsUploading] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -79,19 +81,61 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
     }
   };
 
-  const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
-      onSendFile(file);
+      // Check file size limit
+      if (file.size > config.fileUpload.maxSize) {
+        alert(`File size must be less than ${config.fileUpload.maxSize / (1024 * 1024)}MB`);
+        return;
+      }
+      
+      setIsUploading(true);
+      try {
+        console.log('Sending file:', file.name, file.size, 'bytes');
+        const result = await onSendFile(file);
+        if (!result) {
+          throw new Error('File upload returned null');
+        }
+        console.log('File sent successfully:', result);
+      } catch (error) {
+        console.error('Error uploading file:', error);
+        alert(`Failed to upload file: ${error instanceof Error ? error.message : 'Unknown error'}`);
+      } finally {
+        setIsUploading(false);
+        // Clear the input
+        if (fileInputRef.current) {
+          fileInputRef.current.value = '';
+        }
+      }
     }
   };
 
-  const handleDrop = (e: React.DragEvent) => {
+  const handleDrop = async (e: React.DragEvent) => {
     e.preventDefault();
     setIsDragging(false);
     const file = e.dataTransfer.files[0];
     if (file) {
-      onSendFile(file);
+      // Check file size limit
+      if (file.size > config.fileUpload.maxSize) {
+        alert(`File size must be less than ${config.fileUpload.maxSize / (1024 * 1024)}MB`);
+        return;
+      }
+      
+      setIsUploading(true);
+      try {
+        console.log('Dropping file:', file.name, file.size, 'bytes');
+        const result = await onSendFile(file);
+        if (!result) {
+          throw new Error('File upload returned null');
+        }
+        console.log('File dropped successfully:', result);
+      } catch (error) {
+        console.error('Error uploading dropped file:', error);
+        alert(`Failed to upload file: ${error instanceof Error ? error.message : 'Unknown error'}`);
+      } finally {
+        setIsUploading(false);
+      }
     }
   };
 
@@ -192,14 +236,22 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
                 {message.type === 'text' ? (
                   <p className="break-words">{message.content}</p>
                 ) : (
-                  <div className="flex items-center space-x-2">
-                    <File className="w-5 h-5" />
-                    <div className="flex-1">
-                      <p className="font-medium text-sm">{message.fileName}</p>
+                  <div className="flex items-center space-x-2 p-2 bg-white/10 rounded-lg">
+                    <File className="w-6 h-6 text-blue-400" />
+                    <div className="flex-1 min-w-0">
+                      <p className="font-medium text-sm truncate">{message.fileName}</p>
                       <p className="text-xs opacity-70">{formatFileSize(message.fileSize || 0)}</p>
                     </div>
-                    <button className="p-1 hover:bg-white/20 rounded-md" title="Download file">
-                      <Download className="w-4 h-4" />
+                    <button 
+                      className="p-2 hover:bg-white/20 rounded-md transition-colors" 
+                      title="Download file"
+                      onClick={() => {
+                        if (message.fileId) {
+                          window.open(getFileDownloadUrl(message.fileId), '_blank');
+                        }
+                      }}
+                    >
+                      <Download className="w-5 h-5" />
                     </button>
                   </div>
                 )}
@@ -235,7 +287,8 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
           />
           <button
             onClick={() => fileInputRef.current?.click()}
-            className="p-2 hover:bg-white/20 rounded-xl transition-colors"
+            disabled={isUploading}
+            className="p-2 hover:bg-white/20 rounded-xl transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
           >
             <Paperclip className="w-5 h-5 text-white/70 hover:text-white" />
           </button>

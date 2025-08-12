@@ -4,6 +4,7 @@ import { OnlineDevices } from './components/OnlineDevices';
 import { ChatArea } from './components/ChatArea';
 import { NetworkService } from './services/NetworkService';
 import { Message } from './types';
+import { config } from './config';
 
 interface OnlineDevice {
   id: string;
@@ -65,9 +66,10 @@ function App() {
     
     // Store callback references to prevent duplicates
     const messageCallback = (data: any) => {
-      if (data.type === 'message') {
-        console.log('Received message from network service:', data);
-        
+      console.log('Received message from network service:', data);
+      
+      // Handle both 'message' and 'file' types
+      if (data.type === 'message' || data.type === 'file') {
         // Skip if this is our own message (we already added it when sending)
         if (data.senderId === currentUser!.id) {
           console.log('Skipping own message from server:', data.id);
@@ -83,9 +85,10 @@ function App() {
           senderName: data.senderName,
           content: data.content || '',
           timestamp: data.timestamp,
-          type: data.messageType === 'file' ? 'file' : 'text',
+          type: data.type === 'file' || data.messageType === 'file' ? 'file' : 'text',
           fileName: data.fileName,
           fileSize: data.fileSize,
+          fileId: data.fileId,
           receiverId: isPeerToPeer ? data.receiverId : null, // Set receiverId for peer-to-peer messages
         };
         
@@ -154,7 +157,7 @@ function App() {
       const currentDevices = networkService.getOnlineDevices();
       console.log('Periodic device refresh:', currentDevices);
       setOnlineDevices(currentDevices ?? []);
-    }, 5000); // Refresh every 5 seconds
+    }, config.ui.messageRefreshInterval); // Refresh based on config
     
     return () => {
       console.log('App useEffect cleanup - cleaning up network service');
@@ -210,8 +213,41 @@ function App() {
     setMessages(prev => [...prev, newMessage]);
   };
 
-  const handleSendFile = (file: File) => {
-    return;
+  const handleSendFile = async (file: File) => {
+    if (!selectedDeviceId || selectedDeviceId === BROADCAST_ID) {
+      const messageData = await networkService.sendFile(file);
+      if (!messageData) return;
+      const newMessage: Message = {
+        id: messageData.id,
+        senderId: messageData.senderId,
+        senderName: messageData.senderName,
+        content: messageData.content,
+        timestamp: messageData.timestamp,
+        type: 'file',
+        fileName: messageData.fileName,
+        fileSize: messageData.fileSize,
+        fileId: messageData.fileId,
+        receiverId: messageData.receiverId,
+      };
+      setMessages(prev => [...prev, newMessage]);
+      return;
+    }
+    
+    const messageData = await networkService.sendFile(file, selectedDeviceId);
+    if (!messageData) return;
+    const newMessage: Message = {
+      id: messageData.id,
+      senderId: messageData.senderId,
+      senderName: messageData.senderName,
+      content: messageData.content,
+      timestamp: messageData.timestamp,
+      type: 'file',
+      fileName: messageData.fileName,
+      fileSize: messageData.fileSize,
+      fileId: messageData.fileId,
+      receiverId: messageData.receiverId,
+    };
+    setMessages(prev => [...prev, newMessage]);
   };
 
   const filteredMessages = selectedDeviceId && selectedDeviceId !== BROADCAST_ID && currentUser

@@ -1,0 +1,122 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>File Sharing Test</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 20px; }
+        .test-section { margin: 20px 0; padding: 20px; border: 1px solid #ccc; border-radius: 5px; }
+        .log { background: #f0f0f0; padding: 10px; margin: 10px 0; border-radius: 5px; max-height: 300px; overflow-y: auto; }
+        .error { color: red; }
+        .success { color: green; }
+        button { padding: 10px 20px; margin: 5px; }
+        input[type="file"] { margin: 10px 0; }
+    </style>
+</head>
+<body>
+    <h1>File Sharing Test</h1>
+    
+    <div class="test-section">
+        <h2>File Upload Test</h2>
+        <input type="file" id="fileInput" />
+        <button onclick="uploadFile()">Upload File</button>
+        <div id="uploadLog" class="log"></div>
+    </div>
+    
+    <div class="test-section">
+        <h2>File Download Test</h2>
+        <input type="text" id="fileIdInput" placeholder="Enter file ID (filename)" />
+        <button onclick="downloadFile()">Download File</button>
+        <div id="downloadLog" class="log"></div>
+    </div>
+
+    <script>
+        // Configuration - update these URLs to match your backend
+        const BACKEND_URL = 'http://localhost:3001';
+        
+        const uploadLog = document.getElementById('uploadLog');
+        const downloadLog = document.getElementById('downloadLog');
+
+        function log(message, type = 'info', target = uploadLog) {
+            const div = document.createElement('div');
+            div.className = type;
+            div.textContent = `${new Date().toLocaleTimeString()}: ${message}`;
+            target.appendChild(div);
+            target.scrollTop = target.scrollHeight;
+        }
+
+        async function uploadFile() {
+            const fileInput = document.getElementById('fileInput');
+            const file = fileInput.files[0];
+            
+            if (!file) {
+                log('Please select a file first', 'error');
+                return;
+            }
+
+            log(`Starting upload for: ${file.name} (${file.size} bytes)`);
+            
+            try {
+                const formData = new FormData();
+                formData.append('file', file);
+
+                                const response = await fetch(`${BACKEND_URL}/upload`, {
+                  method: 'POST',
+                  body: formData,
+                });
+
+                if (!response.ok) {
+                    throw new Error(`Upload failed: ${response.status} ${response.statusText}`);
+                }
+
+                const result = await response.json();
+                log(`Upload successful! File ID: ${result.filename}`, 'success');
+                log(`Original name: ${result.originalName}, Size: ${result.size} bytes`);
+                
+                // Auto-fill the download test
+                document.getElementById('fileIdInput').value = result.filename;
+                
+            } catch (error) {
+                log(`Upload error: ${error.message}`, 'error');
+            }
+        }
+
+        function downloadFile() {
+            const fileId = document.getElementById('fileIdInput').value.trim();
+            
+            if (!fileId) {
+                log('Please enter a file ID', 'error', downloadLog);
+                return;
+            }
+
+            log(`Attempting to download file: ${fileId}`, 'info', downloadLog);
+            
+            try {
+                const url = `${BACKEND_URL}/files/${fileId}`;
+                window.open(url, '_blank');
+                log(`Download link opened: ${url}`, 'success', downloadLog);
+            } catch (error) {
+                log(`Download error: ${error.message}`, 'error', downloadLog);
+            }
+        }
+
+        // Test server connectivity
+        async function testServer() {
+            try {
+                const response = await fetch(BACKEND_URL);
+                if (response.ok) {
+                    log('Server is reachable', 'success');
+                } else {
+                    log(`Server responded with: ${response.status}`, 'error');
+                }
+            } catch (error) {
+                log(`Server test failed: ${error.message}`, 'error');
+            }
+        }
+
+        // Test server on page load
+        testServer();
+    </script>
+</body>
+</html>

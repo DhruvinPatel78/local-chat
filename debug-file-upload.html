@@ -1,0 +1,225 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>File Upload Debug</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 20px; }
+        .test-section { margin: 20px 0; padding: 20px; border: 1px solid #ccc; border-radius: 5px; }
+        .log { background: #f0f0f0; padding: 10px; margin: 10px 0; border-radius: 5px; max-height: 300px; overflow-y: auto; }
+        .error { color: red; }
+        .success { color: green; }
+        .info { color: blue; }
+        button { padding: 10px 20px; margin: 5px; }
+        input[type="file"] { margin: 10px 0; }
+        .config { background: #e8f4f8; padding: 15px; border-radius: 5px; margin: 10px 0; }
+    </style>
+</head>
+<body>
+    <h1>File Upload Debug Tool</h1>
+    
+    <div class="config">
+        <h3>Configuration</h3>
+        <p><strong>Backend URL:</strong> <span id="backendUrl">Loading...</span></p>
+        <p><strong>WebSocket URL:</strong> <span id="wsUrl">Loading...</span></p>
+        <button onclick="testBackendConnection()">Test Backend Connection</button>
+        <button onclick="testWebSocketConnection()">Test WebSocket Connection</button>
+    </div>
+    
+    <div class="test-section">
+        <h2>Step 1: Test File Upload</h2>
+        <input type="file" id="fileInput" />
+        <button onclick="testFileUpload()">Upload File</button>
+        <div id="uploadLog" class="log"></div>
+    </div>
+    
+    <div class="test-section">
+        <h2>Step 2: Test WebSocket File Message</h2>
+        <input type="text" id="fileIdInput" placeholder="Enter file ID from step 1" />
+        <input type="text" id="fileNameInput" placeholder="Enter file name" />
+        <input type="number" id="fileSizeInput" placeholder="Enter file size" />
+        <button onclick="testWebSocketFileMessage()">Send File Message via WebSocket</button>
+        <div id="websocketLog" class="log"></div>
+    </div>
+    
+    <div class="test-section">
+        <h2>Step 3: Test File Download</h2>
+        <input type="text" id="downloadFileId" placeholder="Enter file ID to download" />
+        <button onclick="testFileDownload()">Download File</button>
+        <div id="downloadLog" class="log"></div>
+    </div>
+
+    <script>
+        const uploadLog = document.getElementById('uploadLog');
+        const websocketLog = document.getElementById('websocketLog');
+        const downloadLog = document.getElementById('downloadLog');
+        
+        // Configuration - update these URLs to match your backend
+        const BACKEND_URL = 'http://localhost:3001';
+        const WS_URL = 'ws://localhost:3001';
+        
+        let ws = null;
+        let uploadedFileInfo = null;
+
+        function log(message, type = 'info', target = uploadLog) {
+            const div = document.createElement('div');
+            div.className = type;
+            div.textContent = `${new Date().toLocaleTimeString()}: ${message}`;
+            target.appendChild(div);
+            target.scrollTop = target.scrollHeight;
+        }
+
+        function updateConfigDisplay() {
+            document.getElementById('backendUrl').textContent = BACKEND_URL;
+            document.getElementById('wsUrl').textContent = WS_URL;
+        }
+
+        async function testBackendConnection() {
+            log('Testing backend connection...', 'info');
+            try {
+                const response = await fetch(BACKEND_URL);
+                if (response.ok) {
+                    log('✅ Backend is reachable', 'success');
+                } else {
+                    log(`❌ Backend responded with: ${response.status}`, 'error');
+                }
+            } catch (error) {
+                log(`❌ Backend connection failed: ${error.message}`, 'error');
+            }
+        }
+
+        function testWebSocketConnection() {
+            log('Testing WebSocket connection...', 'info', websocketLog);
+            try {
+                ws = new WebSocket(WS_URL);
+                
+                ws.onopen = () => {
+                    log('✅ WebSocket connected successfully', 'success', websocketLog);
+                    // Send init message
+                    const initMessage = {
+                        type: 'init',
+                        id: 'debug-' + Date.now(),
+                        name: 'Debug User'
+                    };
+                    ws.send(JSON.stringify(initMessage));
+                    log('Sent init message: ' + JSON.stringify(initMessage), 'info', websocketLog);
+                };
+                
+                ws.onmessage = (event) => {
+                    try {
+                        const data = JSON.parse(event.data);
+                        log('📨 Received: ' + JSON.stringify(data, null, 2), 'info', websocketLog);
+                    } catch (e) {
+                        log('📨 Received non-JSON message: ' + event.data, 'info', websocketLog);
+                    }
+                };
+                
+                ws.onclose = (event) => {
+                    log(`❌ WebSocket closed: ${event.code} - ${event.reason}`, 'error', websocketLog);
+                };
+                
+                ws.onerror = (error) => {
+                    log('❌ WebSocket error: ' + error, 'error', websocketLog);
+                };
+            } catch (error) {
+                log('❌ WebSocket connection failed: ' + error.message, 'error', websocketLog);
+            }
+        }
+
+        async function testFileUpload() {
+            const fileInput = document.getElementById('fileInput');
+            const file = fileInput.files[0];
+            
+            if (!file) {
+                log('❌ Please select a file first', 'error');
+                return;
+            }
+
+            log(`📤 Starting upload for: ${file.name} (${file.size} bytes)`, 'info');
+            
+            try {
+                const formData = new FormData();
+                formData.append('file', file);
+
+                const response = await fetch(`${BACKEND_URL}/upload`, {
+                    method: 'POST',
+                    body: formData,
+                });
+
+                if (!response.ok) {
+                    const errorText = await response.text();
+                    throw new Error(`Upload failed: ${response.status} ${response.statusText} - ${errorText}`);
+                }
+
+                const result = await response.json();
+                uploadedFileInfo = result;
+                log(`✅ Upload successful!`, 'success');
+                log(`File ID: ${result.filename}`, 'info');
+                log(`Original name: ${result.originalName}`, 'info');
+                log(`Size: ${result.size} bytes`, 'info');
+                
+                // Auto-fill the WebSocket test
+                document.getElementById('fileIdInput').value = result.filename;
+                document.getElementById('fileNameInput').value = result.originalName;
+                document.getElementById('fileSizeInput').value = result.size;
+                
+            } catch (error) {
+                log(`❌ Upload error: ${error.message}`, 'error');
+            }
+        }
+
+        function testWebSocketFileMessage() {
+            if (!ws || ws.readyState !== WebSocket.OPEN) {
+                log('❌ WebSocket not connected', 'error', websocketLog);
+                return;
+            }
+
+            const fileId = document.getElementById('fileIdInput').value.trim();
+            const fileName = document.getElementById('fileNameInput').value.trim();
+            const fileSize = document.getElementById('fileSizeInput').value.trim();
+            
+            if (!fileId || !fileName || !fileSize) {
+                log('❌ Please fill in all file details', 'error', websocketLog);
+                return;
+            }
+
+            const fileMessage = {
+                type: 'message',
+                content: `Sent file: ${fileName}`,
+                messageType: 'file',
+                fileName: fileName,
+                fileSize: parseInt(fileSize),
+                fileId: fileId,
+                receiverId: null // broadcast
+            };
+
+            log('📤 Sending file message via WebSocket: ' + JSON.stringify(fileMessage, null, 2), 'info', websocketLog);
+            ws.send(JSON.stringify(fileMessage));
+        }
+
+        function testFileDownload() {
+            const fileId = document.getElementById('downloadFileId').value.trim();
+            
+            if (!fileId) {
+                log('❌ Please enter a file ID', 'error', downloadLog);
+                return;
+            }
+
+            log(`📥 Attempting to download file: ${fileId}`, 'info', downloadLog);
+            
+            try {
+                const url = `${BACKEND_URL}/files/${fileId}`;
+                window.open(url, '_blank');
+                log(`✅ Download link opened: ${url}`, 'success', downloadLog);
+            } catch (error) {
+                log(`❌ Download error: ${error.message}`, 'error', downloadLog);
+            }
+        }
+
+        // Initialize
+        updateConfigDisplay();
+        testBackendConnection();
+    </script>
+</body>
+</html>

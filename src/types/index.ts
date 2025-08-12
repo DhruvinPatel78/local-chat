@@ -14,6 +14,7 @@ export interface Message {
   type: 'text' | 'file';
   fileName?: string;
   fileSize?: number;
+  fileId?: string;
   receiverId?: string | null;
   isRead?: boolean;
   readAt?: number;

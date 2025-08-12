@@ -1,3 +1,5 @@
+import { config, getWsUrl, getFileUploadUrl } from '../config';
+
 export class NetworkService {
   private localUser: { id: string; name: string } | null = null;
   private onlineDevices: Map<string, any> = new Map();
@@ -7,7 +9,7 @@ export class NetworkService {
   private pendingNameUpdate: string | null = null;
   private isConnected: boolean = false;
   private reconnectAttempts: number = 0;
-  private maxReconnectAttempts: number = 5;
+  private maxReconnectAttempts: number = config.websocket.reconnectAttempts;
 
   constructor() {
     this.initializeLocalUser();
@@ -17,11 +19,12 @@ export class NetworkService {
 
   start() {
     if (!this.ws) {
-      console.log('Starting WebSocket connection to wss://local-chat-be.onrender.com');
-      this.ws = new WebSocket('wss://local-chat-be.onrender.com');
+      const wsUrl = getWsUrl();
+      console.log('Starting WebSocket connection to', wsUrl);
+      this.ws = new WebSocket(wsUrl);
 
       this.ws.onopen = () => {
-        console.log('WebSocket connected successfully to wss://local-chat-be.onrender.com');
+        console.log('WebSocket connected successfully to', getWsUrl());
         this.isConnected = true;
         this.reconnectAttempts = 0;
         // Always send id and name on connect
@@ -51,6 +54,10 @@ export class NetworkService {
             break;
           case 'message':
             console.log('NetworkService received message:', data);
+            // Ensure file messages are properly marked
+            if (data.messageType === 'file') {
+              data.type = 'file';
+            }
             this.messageCallbacks.forEach(callback => callback(data));
             break;
         }
@@ -64,7 +71,10 @@ export class NetworkService {
         // Try to reconnect if we haven't exceeded max attempts
         if (this.reconnectAttempts < this.maxReconnectAttempts) {
           this.reconnectAttempts++;
-          const delay = Math.min(1000 * Math.pow(2, this.reconnectAttempts), 10000); // Exponential backoff
+          const delay = Math.min(
+            config.websocket.reconnectDelay * Math.pow(2, this.reconnectAttempts), 
+            config.websocket.maxReconnectDelay
+          );
           console.log(`Attempting to reconnect in ${delay}ms (attempt ${this.reconnectAttempts}/${this.maxReconnectAttempts})`);
           setTimeout(() => {
             this.start();
@@ -194,9 +204,76 @@ export class NetworkService {
     this.ws.send(JSON.stringify(readReceipt));
   }
 
-  sendFile(file: File): any {
-    // File transfer not implemented in backend yet
-    return null;
+  async sendFile(file: File, receiverId?: string): Promise<any> {
+    if (!this.localUser || !this.ws || this.ws.readyState !== WebSocket.OPEN) {
+      console.error('Cannot send file - WebSocket not ready or user not available');
+      return null;
+    }
+
+    try {
+      console.log('Starting file upload:', file.name, file.size, 'bytes');
+      
+      // Upload file to server
+      const formData = new FormData();
+      formData.append('file', file);
+
+      const uploadUrl = getFileUploadUrl();
+      console.log('Uploading to:', uploadUrl);
+      
+      const response = await fetch(uploadUrl, {
+        method: 'POST',
+        body: formData,
+      });
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        throw new Error(`File upload failed: ${response.status} ${response.statusText} - ${errorText}`);
+      }
+
+      const fileInfo = await response.json();
+      console.log('File uploaded successfully:', fileInfo);
+
+      // Send file message through WebSocket
+      const messageId = this.generateId();
+      const timestamp = Date.now();
+
+      const messageData: any = {
+        type: 'message',
+        content: `Sent file: ${file.name}`,
+        id: messageId,
+        timestamp: timestamp,
+        senderId: this.localUser!.id,
+        senderName: this.localUser!.name,
+        messageType: 'file',
+        fileName: file.name,
+        fileSize: file.size,
+        fileId: fileInfo.filename,
+      };
+
+      if (receiverId) {
+        messageData.receiverId = receiverId;
+      }
+
+      console.log('Sending file message:', messageData);
+      this.ws!.send(JSON.stringify(messageData));
+
+      // Return properly structured message data for the frontend
+      return {
+        id: messageId,
+        content: `Sent file: ${file.name}`,
+        timestamp: timestamp,
+        senderId: this.localUser!.id,
+        senderName: this.localUser!.name,
+        receiverId: receiverId || null,
+        type: 'file',
+        fileName: file.name,
+        fileSize: file.size,
+        fileId: fileInfo.filename,
+      };
+    } catch (error) {
+      console.error('Error sending file:', error);
+      return null;
+    }
   }
 
   onMessage(callback: (message: any) => void) {
