@@ -89,7 +89,7 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
         alert(`File size must be less than ${config.fileUpload.maxSize / (1024 * 1024)}MB`);
         return;
       }
-      
+
       setIsUploading(true);
       try {
         console.log('Sending file:', file.name, file.size, 'bytes');
@@ -121,7 +121,7 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
         alert(`File size must be less than ${config.fileUpload.maxSize / (1024 * 1024)}MB`);
         return;
       }
-      
+
       setIsUploading(true);
       try {
         console.log('Dropping file:', file.name, file.size, 'bytes');
@@ -173,23 +173,20 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
   }
 
   return (
-    <div className="bg-white/10 backdrop-blur-md rounded-2xl border border-white/20 flex flex-col h-full">
+    <div className="bg-white/10 backdrop-blur-md rounded-none border-none md:rounded-tr-2xl md:border md:border-white/20 flex flex-col h-full">
       {/* Chat Header */}
-      <div className="p-4 border-b border-white/10 flex items-center space-x-3">
+      <div className="p-4 border-b border-white/10 flex items-center gap-2 sticky-top">
         {onBack && (
           <button
-            className="mr-2 p-1 rounded-full hover:bg-white/20 focus:outline-none"
+            className="p-1 rounded-full hover:bg-white/20 focus:outline-none"
             onClick={onBack}
           >
             <ArrowLeft className="w-6 h-6 text-blue-400" />
           </button>
         )}
-        <div className="w-10 h-10 bg-blue-500/20 rounded-full flex items-center justify-center">
-          <File className="w-5 h-5 text-blue-400" />
-        </div>
-        <div>
+        <div className={'flex gap-2 items-center'}>
           <p className="text-white font-medium text-lg">{selectedDevice.name}</p>
-          <span className="text-xs text-green-400">Online</span>
+          <div className="w-3 h-3 rounded-full bg-green-400" />
         </div>
       </div>
       {/* Messages Area */}
@@ -242,8 +239,8 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
                       <p className="font-medium text-sm truncate">{message.fileName}</p>
                       <p className="text-xs opacity-70">{formatFileSize(message.fileSize || 0)}</p>
                     </div>
-                    <button 
-                      className="p-2 hover:bg-white/20 rounded-md transition-colors" 
+                    <button
+                      className="p-2 hover:bg-white/20 rounded-md transition-colors"
                       title="Download file"
                       onClick={() => {
                         if (message.fileId) {
@@ -257,19 +254,19 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
                 )}
                 <p className="text-xs opacity-70 mt-1">{formatTime(message.timestamp)}</p>
                 {/* Read receipt for sent messages */}
-                {false && message.senderId === currentUserId && message.receiverId && (
-                  <div className="flex items-center justify-end mt-1">
-                    {message.isRead ? (
-                      <div className="flex items-center space-x-1 text-xs opacity-70">
-                        <span>Read</span>
-                        <span>•</span>
-                        <span>{message.readAt ? formatTime(message.readAt) : ''}</span>
-                      </div>
-                    ) : (
-                      <div className="text-xs opacity-50">Delivered</div>
-                    )}
-                  </div>
-                )}
+                {/*{false && message.senderId === currentUserId && message.receiverId && (*/}
+                {/*  <div className="flex items-center justify-end mt-1">*/}
+                {/*    {message.isRead ? (*/}
+                {/*      <div className="flex items-center space-x-1 text-xs opacity-70">*/}
+                {/*        <span>Read</span>*/}
+                {/*        <span>•</span>*/}
+                {/*        <span>{message.readAt ? formatTime(message.readAt) : ''}</span>*/}
+                {/*      </div>*/}
+                {/*    ) : (*/}
+                {/*      <div className="text-xs opacity-50">Delivered</div>*/}
+                {/*    )}*/}
+                {/*  </div>*/}
+                {/*)}*/}
               </div>
             </div>
           ))
@@ -278,7 +275,7 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
       </div>
       {/* Input Area */}
       <div className="p-4 border-t border-white/10">
-        <div className="flex items-center space-x-2">
+        <div className="flex items-center justify-around gap-2">
           <input
             type="file"
             ref={fileInputRef}
@@ -297,7 +294,7 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
               value={inputMessage}
               onChange={(e) => setInputMessage(e.target.value)}
               onKeyDown={handleKeyPress}
-              placeholder={`Type a message to ${selectedDevice.name}...`}
+              placeholder={`Type a message send`}
               className="w-full bg-white/10 border border-white/20 rounded-xl px-4 py-2 text-white placeholder-white/50 focus:outline-none focus:ring-2 focus:ring-blue-400 resize-none max-h-32"
               rows={1}
             />

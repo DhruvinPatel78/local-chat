@@ -38,7 +38,7 @@ export const UserProfile: React.FC<UserProfileProps> = ({
   };
 
   return (
-    <div className="bg-white/10 backdrop-blur-md rounded-t-2xl md:rounded-tl-2xl md:rounded-t-none p-6 border border-white/20">
+    <div className="bg-white/10 backdrop-blur-md rounded-none border-none md:rounded-tl-2xl md:rounded-t-none p-6 md:border md:border-white/20">
       <div className="flex items-center justify-between">
         <div className="flex items-center space-x-3">
           {!isEditing ? (

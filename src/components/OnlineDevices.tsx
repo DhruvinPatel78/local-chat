@@ -20,9 +20,9 @@ interface OnlineDevicesProps {
 
 export const OnlineDevices: React.FC<OnlineDevicesProps> = ({ devices, currentUserId, selectedDeviceId, onSelectDevice, unreadCounts = {}, onRefresh, isConnected = false }) => {
   const [isRefreshing, setIsRefreshing] = React.useState(false);
-  
+
   console.log('OnlineDevices render - devices:', devices, 'currentUserId:', currentUserId);
-  
+
   const formatLastSeen = (timestamp: number) => {
     const seconds = Math.floor((Date.now() - timestamp) / 1000);
     if (seconds < 60) return 'Just now';
@@ -58,7 +58,7 @@ export const OnlineDevices: React.FC<OnlineDevicesProps> = ({ devices, currentUs
           </button>
         )}
       </div>
-      
+
       {!isConnected ? (
         <div className="text-center py-8">
           <Smartphone className="w-12 h-12 text-white/40 mx-auto mb-3" />
@@ -82,7 +82,7 @@ export const OnlineDevices: React.FC<OnlineDevicesProps> = ({ devices, currentUs
             return (
               <div
                 key={device.id}
-                className={`flex items-center justify-between p-3 ${filteredDevices.length - 1 === index ? 'rounded-b-xl' : 'rounded-none'}  md:rounded-b-none border border-white/10 cursor-pointer transition-colors ${selectedDeviceId === device.id ? 'bg-blue-500/30 border-blue-400' : 'bg-white/5 hover:bg-white/10'}`}
+                className={`flex items-center justify-between p-3 md:rounded-b-none border border-white/10 cursor-pointer transition-colors ${selectedDeviceId === device.id ? 'bg-blue-500/30 border-blue-400' : 'bg-white/5 hover:bg-white/10'}`}
                 onClick={() => onSelectDevice && onSelectDevice(device.id)}
               >
                 <div className="flex items-center space-x-3">

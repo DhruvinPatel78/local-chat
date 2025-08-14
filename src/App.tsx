@@ -28,27 +28,27 @@ function App() {
   // Calculate unread message counts for each device
   const unreadCounts = React.useMemo(() => {
     const counts: { [deviceId: string]: number } = {};
-    
+
     if (!currentUser) return counts;
-    
+
     // Peer-to-peer unread counts
     onlineDevices.forEach(device => {
       if (device.id !== currentUser.id) {
-        const unreadCount = messages.filter(message => 
-          message.senderId === device.id && 
-          message.receiverId === currentUser.id && 
+        const unreadCount = messages.filter(message =>
+          message.senderId === device.id &&
+          message.receiverId === currentUser.id &&
           !message.isRead
         ).length;
         counts[device.id] = unreadCount;
       }
     });
-    
+
     // Broadcast unread count
     const broadcastUnread = messages.filter(
       message => message.receiverId === null && message.senderId !== currentUser.id && !message.isRead
     ).length;
     counts[BROADCAST_ID] = broadcastUnread;
-    
+
     return counts;
   }, [messages, onlineDevices, currentUser]);
 
@@ -63,13 +63,13 @@ function App() {
 
   useEffect(() => {
     console.log('App useEffect running - setting up network service');
-    
+
     // Do not auto-connect on page load. User will connect via the toggle.
-    
+
     // Store callback references to prevent duplicates
     const messageCallback = (data: any) => {
       console.log('Received message from network service:', data);
-      
+
       // Handle both 'message' and 'file' types
       if (data.type === 'message' || data.type === 'file') {
         // Skip if this is our own message (we already added it when sending)
@@ -77,10 +77,10 @@ function App() {
           console.log('Skipping own message from server:', data.id);
           return;
         }
-        
+
         // Determine if this is a peer-to-peer message or broadcast
         const isPeerToPeer = data.receiverId !== null && data.receiverId !== undefined;
-        
+
         const message: Message = {
           id: data.id,
           senderId: data.senderId,
@@ -93,9 +93,9 @@ function App() {
           fileId: data.fileId,
           receiverId: isPeerToPeer ? data.receiverId : null, // Set receiverId for peer-to-peer messages
         };
-        
+
         console.log('Processed message:', message);
-        
+
         // Prevent duplicate messages by checking if message ID already exists
         setMessages(prev => {
           const messageExists = prev.some(m => m.id === message.id);
@@ -110,42 +110,42 @@ function App() {
         console.log('Received read receipt:', data);
         console.log('Current user ID:', currentUser!.id);
         console.log('Looking for message with ID:', data.messageId);
-        
+
         // Find the message that should be updated
-        const messageToUpdate = messages.find(message => 
-          message.id === data.messageId && 
-          message.senderId === currentUser!.id && 
+        const messageToUpdate = messages.find(message =>
+          message.id === data.messageId &&
+          message.senderId === currentUser!.id &&
           message.receiverId === data.senderId
         );
-        
+
         console.log('Message to update:', messageToUpdate);
-        
+
         // Update message read status for messages sent by current user
         // data.senderId = who read the message (Chrome), data.originalSenderId = who sent the original message (Safari)
         // We need to find messages sent by current user (Safari) to the person who read it (Chrome)
         setMessages(prev => {
           const updatedMessages = prev.map(message => {
-            if (message.id === data.messageId && 
-                message.senderId === currentUser!.id && 
+            if (message.id === data.messageId &&
+                message.senderId === currentUser!.id &&
                 message.receiverId === data.senderId) {
               console.log('Updating message to read:', message.id, message.content);
               return { ...message, isRead: true, readAt: data.timestamp };
             }
             return message;
           });
-          
+
           console.log('Messages after read receipt update:', updatedMessages);
           return updatedMessages;
         });
       }
     };
-    
+
     const deviceUpdateCallback = (devices: any[]) => {
       console.log('Device update received in App:', devices);
       // Always apply updates to reflect disconnects immediately
       setOnlineDevices(Array.isArray(devices) ? devices : []);
     };
-    
+
     // Register callbacks
     networkService.onMessage(messageCallback);
     networkService.onDeviceUpdate(deviceUpdateCallback);
@@ -157,18 +157,18 @@ function App() {
         setOnlineDevices([]);
       }
     });
-    
+
     const initialDevices = networkService.getOnlineDevices();
     console.log('Initial devices from network service:', initialDevices);
     setOnlineDevices(initialDevices ?? []);
-    
+
     // Periodic refresh of online devices
     const interval = setInterval(() => {
       const currentDevices = networkService.getOnlineDevices();
       console.log('Periodic device refresh:', currentDevices);
       setOnlineDevices(currentDevices ?? []);
     }, config.ui.messageRefreshInterval); // Refresh based on config
-    
+
     return () => {
       console.log('App useEffect cleanup - cleaning up network service');
       clearInterval(interval);
@@ -183,7 +183,7 @@ function App() {
       const timer = setTimeout(() => {
         markMessagesAsRead(selectedDeviceId);
       }, 500);
-      
+
       return () => clearTimeout(timer);
     }
   }, [selectedDeviceId, messages]);
@@ -217,7 +217,7 @@ function App() {
       alert('You are offline. Please connect to send messages.');
       return;
     }
-    
+
     if (!selectedDeviceId || selectedDeviceId === BROADCAST_ID) {
       const messageData = networkService.sendMessage(message);
       if (!messageData) return;
@@ -252,7 +252,7 @@ function App() {
       alert('You are offline. Please connect to send files.');
       return;
     }
-    
+
     if (!selectedDeviceId || selectedDeviceId === BROADCAST_ID) {
       const messageData = await networkService.sendFile(file);
       if (!messageData) return;
@@ -271,7 +271,7 @@ function App() {
       setMessages(prev => [...prev, newMessage]);
       return;
     }
-    
+
     const messageData = await networkService.sendFile(file, selectedDeviceId);
     if (!messageData) return;
     const newMessage: Message = {
@@ -294,7 +294,7 @@ function App() {
         m => {
           const isMatch = ((m.senderId === currentUser.id && m.receiverId === selectedDeviceId) ||
           (m.senderId === selectedDeviceId && m.receiverId === currentUser.id));
-          
+
           console.log('Filtering message:', {
             message: m,
             selectedDeviceId,
@@ -305,7 +305,7 @@ function App() {
             isRead: m.isRead,
             readAt: m.readAt
           });
-          
+
           return isMatch;
         }
       )
@@ -326,20 +326,20 @@ function App() {
   const handleSelectDevice = (id: string) => {
     setSelectedDeviceId(id);
     if (isMobile) setShowChatOnMobile(true);
-    
+
     // Mark messages from this device as read and send read receipts
     if (id !== BROADCAST_ID && currentUser) {
-      const unreadMessages = messages.filter(message => 
+      const unreadMessages = messages.filter(message =>
         message.senderId === id && message.receiverId === currentUser.id && !message.isRead
       );
-      
+
       if (unreadMessages.length > 0) {
-        setMessages(prev => prev.map(message => 
+        setMessages(prev => prev.map(message =>
           message.senderId === id && message.receiverId === currentUser.id && !message.isRead
             ? { ...message, isRead: true, readAt: Date.now() }
             : message
         ));
-        
+
         // Send read receipts for all unread messages
         unreadMessages.forEach(message => {
           networkService.sendReadReceipt(message.id, id);
@@ -351,18 +351,18 @@ function App() {
   // Function to mark messages as read when they're viewed
   const markMessagesAsRead = (deviceId: string) => {
     if (deviceId === BROADCAST_ID || !currentUser) return;
-    
-    const unreadMessages = messages.filter(message => 
+
+    const unreadMessages = messages.filter(message =>
       message.senderId === deviceId && message.receiverId === currentUser.id && !message.isRead
     );
-    
+
     if (unreadMessages.length > 0) {
-      setMessages(prev => prev.map(message => 
+      setMessages(prev => prev.map(message =>
         message.senderId === deviceId && message.receiverId === currentUser.id && !message.isRead
           ? { ...message, isRead: true, readAt: Date.now() }
           : message
       ));
-      
+
       // Send read receipts for all unread messages
       unreadMessages.forEach(message => {
         networkService.sendReadReceipt(message.id, deviceId);
@@ -385,9 +385,9 @@ function App() {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-900 via-purple-900 to-indigo-900">
-      <div className="container mx-auto px-4 py-6 h-screen">
+      <div className="container mx-auto p-0 md:px-4 md:py-6 h-screen">
         {/* PWA Install Prompt */}
-        <div id="pwa-install-prompt" className="hidden fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm">
+        <div id="pwa-install-prompt" className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm">
           <div className="bg-white/10 backdrop-blur-md rounded-xl p-6 border border-white/20 max-w-sm mx-4">
             <div className="text-center">
               <div className="w-16 h-16 mx-auto mb-4 bg-blue-500 rounded-full flex items-center justify-center">
@@ -452,7 +452,7 @@ function App() {
                     if (selectedDeviceId && selectedDeviceId !== BROADCAST_ID) {
                       const message = messages.find(m => m.id === messageId);
                       if (message && message.senderId === selectedDeviceId && message.receiverId === currentUser.id && !message.isRead) {
-                        setMessages(prev => prev.map(m => 
+                        setMessages(prev => prev.map(m =>
                           m.id === messageId ? { ...m, isRead: true, readAt: Date.now() } : m
                         ));
                         networkService.sendReadReceipt(messageId, selectedDeviceId);
@@ -468,7 +468,7 @@ function App() {
             </div>
           )}
         </div>
-        
+
         {/* PWA Install Banner (alternative to main prompt) */}
         <div id="pwa-install-banner" className="hidden fixed bottom-4 left-4 right-4 z-40 bg-blue-500 text-white p-3 rounded-lg shadow-lg">
           <div className="flex items-center justify-between">
