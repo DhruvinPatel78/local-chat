@@ -175,7 +175,7 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
   return (
     <div className="bg-white/10 backdrop-blur-md rounded-none border-none md:rounded-tr-2xl md:border md:border-white/20 flex flex-col h-full">
       {/* Chat Header */}
-      <div className="p-4 border-b border-white/10 flex items-center gap-2 sticky-top">
+      <div className="p-4 border-b border-white/10 flex items-center gap-2 sticky top-0">
         {onBack && (
           <button
             className="p-1 rounded-full hover:bg-white/20 focus:outline-none"
