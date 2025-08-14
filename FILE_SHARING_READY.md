@@ -58,3 +58,4 @@ If you encounter any issues:
 - Check browser console for errors
 - Use the debug tools to isolate the problem
 - Ensure both devices are connected to the same backend
+

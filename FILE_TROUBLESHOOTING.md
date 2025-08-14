@@ -154,3 +154,4 @@ If you're still having issues:
 | "File too large" | File exceeds limit | Reduce file size or increase limit |
 | "CORS error" | Cross-origin issue | Check backend CORS configuration |
 | "File not found" | File not uploaded | Verify upload was successful |
+

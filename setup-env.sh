@@ -28,3 +28,4 @@ echo "   npm run dev"
 echo ""
 echo "🧪 Test file sharing with:"
 echo "   Open debug-file-upload.html in your browser"
+
