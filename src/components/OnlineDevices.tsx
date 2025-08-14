@@ -1,5 +1,5 @@
 import React from 'react';
-import { Smartphone, Circle, Users } from 'lucide-react';
+import { Smartphone, Circle, Users, RefreshCw } from 'lucide-react';
 
 interface OnlineDevice {
   id: string;
@@ -14,9 +14,13 @@ interface OnlineDevicesProps {
   selectedDeviceId?: string | null;
   onSelectDevice?: (id: string) => void;
   unreadCounts?: { [deviceId: string]: number };
+  onRefresh?: () => void;
+  isConnected?: boolean;
 }
 
-export const OnlineDevices: React.FC<OnlineDevicesProps> = ({ devices, currentUserId, selectedDeviceId, onSelectDevice, unreadCounts = {} }) => {
+export const OnlineDevices: React.FC<OnlineDevicesProps> = ({ devices, currentUserId, selectedDeviceId, onSelectDevice, unreadCounts = {}, onRefresh, isConnected = false }) => {
+  const [isRefreshing, setIsRefreshing] = React.useState(false);
+  
   console.log('OnlineDevices render - devices:', devices, 'currentUserId:', currentUserId);
   
   const formatLastSeen = (timestamp: number) => {
@@ -34,7 +38,36 @@ export const OnlineDevices: React.FC<OnlineDevicesProps> = ({ devices, currentUs
 
   return (
     <div>
-      {filteredDevices.length === 0 ? (
+      {/* Header with refresh button */}
+      <div className="flex items-center justify-between p-3 border-b border-white/20">
+        <h3 className="text-white font-medium">Online Devices</h3>
+        {onRefresh && (
+          <button
+            onClick={(e) => {
+              e.stopPropagation();
+              setIsRefreshing(true);
+              onRefresh();
+              // Reset refreshing state after a short delay
+              setTimeout(() => setIsRefreshing(false), 1000);
+            }}
+            disabled={isRefreshing || !isConnected}
+            className={`p-2 hover:bg-white/10 rounded-lg transition-colors group ${(isRefreshing || !isConnected) ? 'opacity-50 cursor-not-allowed' : ''}`}
+            title={!isConnected ? "Connect to refresh device list" : "Refresh device list"}
+          >
+            <RefreshCw className={`w-4 h-4 text-white/70 group-hover:text-white transition-colors ${isRefreshing ? 'animate-spin' : ''}`} />
+          </button>
+        )}
+      </div>
+      
+      {!isConnected ? (
+        <div className="text-center py-8">
+          <Smartphone className="w-12 h-12 text-white/40 mx-auto mb-3" />
+          <p className="text-white/60">You are offline</p>
+          <p className="text-sm text-white/40 mt-1">
+            Connect to see online devices
+          </p>
+        </div>
+      ) : filteredDevices.length === 0 ? (
         <div className="text-center py-8">
           <Smartphone className="w-12 h-12 text-white/40 mx-auto mb-3" />
           <p className="text-white/60">No devices online</p>

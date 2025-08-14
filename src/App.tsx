@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { UserProfile } from './components/UserProfile';
 import { OnlineDevices } from './components/OnlineDevices';
 import { ChatArea } from './components/ChatArea';
+import { ConnectionToggle } from './components/ConnectionToggle';
 import { NetworkService } from './services/NetworkService';
 import { Message } from './types';
 import { config } from './config';
@@ -21,6 +22,7 @@ function App() {
   const [selectedDeviceId, setSelectedDeviceId] = useState<string | null>(null);
   const [isMobile, setIsMobile] = useState(false);
   const [showChatOnMobile, setShowChatOnMobile] = useState(false);
+  const [isConnected, setIsConnected] = useState(networkService.getConnectionState());
   const BROADCAST_ID = '__broadcast__';
 
   // Calculate unread message counts for each device
@@ -62,7 +64,7 @@ function App() {
   useEffect(() => {
     console.log('App useEffect running - setting up network service');
     
-    networkService.start();
+    // Do not auto-connect on page load. User will connect via the toggle.
     
     // Store callback references to prevent duplicates
     const messageCallback = (data: any) => {
@@ -147,6 +149,14 @@ function App() {
     // Register callbacks
     networkService.onMessage(messageCallback);
     networkService.onDeviceUpdate(deviceUpdateCallback);
+    networkService.onConnectionStateChange((connected) => {
+      console.log('Connection state changed:', connected);
+      setIsConnected(connected);
+      if (!connected) {
+        // Clear device list immediately when offline
+        setOnlineDevices([]);
+      }
+    });
     
     const initialDevices = networkService.getOnlineDevices();
     console.log('Initial devices from network service:', initialDevices);
@@ -183,7 +193,31 @@ function App() {
     setCurrentUser({ ...currentUser!, name: newName });
   };
 
+  const handleConnectionToggle = () => {
+    console.log('Connection toggle clicked. Current state:', isConnected);
+    if (isConnected) {
+      console.log('Disconnecting...');
+      networkService.disconnect();
+    } else {
+      console.log('Connecting...');
+      networkService.connect();
+    }
+  };
+
+  const handleRefreshDevices = () => {
+    console.log('Refreshing device list...');
+    console.log('Current connection state:', isConnected);
+    console.log('Current devices:', deviceList);
+    // Request fresh device list from server
+    networkService.refreshDevices();
+  };
+
   const handleSendMessage = (message: string) => {
+    if (!isConnected) {
+      alert('You are offline. Please connect to send messages.');
+      return;
+    }
+    
     if (!selectedDeviceId || selectedDeviceId === BROADCAST_ID) {
       const messageData = networkService.sendMessage(message);
       if (!messageData) return;
@@ -214,6 +248,11 @@ function App() {
   };
 
   const handleSendFile = async (file: File) => {
+    if (!isConnected) {
+      alert('You are offline. Please connect to send files.');
+      return;
+    }
+    
     if (!selectedDeviceId || selectedDeviceId === BROADCAST_ID) {
       const messageData = await networkService.sendFile(file);
       if (!messageData) return;
@@ -374,6 +413,11 @@ function App() {
                 userName={currentUser.name}
                 onNameChange={handleNameChange}
                 onlineDevices={deviceList.length}
+                isConnected={isConnected}
+              />
+              <ConnectionToggle
+                isConnected={isConnected}
+                onToggle={handleConnectionToggle}
               />
               <div className="flex-1 overflow-y-auto">
                 <OnlineDevices
@@ -382,6 +426,8 @@ function App() {
                   selectedDeviceId={selectedDeviceId}
                   onSelectDevice={handleSelectDevice}
                   unreadCounts={unreadCounts}
+                  onRefresh={handleRefreshDevices}
+                  isConnected={isConnected}
                 />
               </div>
             </div>

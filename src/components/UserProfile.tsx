@@ -5,12 +5,14 @@ interface UserProfileProps {
   userName: string;
   onNameChange: (name: string) => void;
   onlineDevices: number;
+  isConnected?: boolean;
 }
 
 export const UserProfile: React.FC<UserProfileProps> = ({
   userName,
   onNameChange,
-  onlineDevices
+  onlineDevices,
+  isConnected = true
 }) => {
   const [isEditing, setIsEditing] = useState(false);
   const [tempName, setTempName] = useState(userName);
@@ -39,9 +41,11 @@ export const UserProfile: React.FC<UserProfileProps> = ({
     <div className="bg-white/10 backdrop-blur-md rounded-t-2xl md:rounded-tl-2xl md:rounded-t-none p-6 border border-white/20">
       <div className="flex items-center justify-between">
         <div className="flex items-center space-x-3">
-          <div className="w-12 h-12 bg-blue-500 rounded-full flex items-center justify-center">
-            <User className="w-6 h-6 text-white" />
-          </div>
+          {!isEditing ? (
+            <div className="w-12 h-12 bg-blue-500 rounded-full flex items-center justify-center">
+              <User className="w-6 h-6 text-white" />
+            </div>
+          ) : null}
           <div>
             {isEditing ? (
               <div className="flex items-center space-x-2">
@@ -58,13 +62,13 @@ export const UserProfile: React.FC<UserProfileProps> = ({
                   onClick={handleSave}
                   className="p-1 hover:bg-white/20 rounded-md transition-colors"
                 >
-                  <Check className="w-4 h-4 text-green-400" />
+                  <Check className="w-6 h-6 text-green-400" />
                 </button>
                 <button
                   onClick={handleCancel}
                   className="p-1 hover:bg-white/20 rounded-md transition-colors"
                 >
-                  <X className="w-4 h-4 text-red-400" />
+                  <X className="w-6 h-6 text-red-400" />
                 </button>
               </div>
             ) : (
@@ -79,13 +83,13 @@ export const UserProfile: React.FC<UserProfileProps> = ({
               </div>
             )}
             <div className="flex items-center space-x-2 mt-1">
-              <div className={`w-3 h-3 rounded-full ${onlineDevices > 0 ? 'bg-green-400' : 'bg-gray-400'}`}>
-                {onlineDevices > 0 && (
+              <div className={`w-3 h-3 rounded-full ${isConnected && onlineDevices > 0 ? 'bg-green-400' : 'bg-gray-400'}`}>
+                {isConnected && onlineDevices > 0 && (
                   <div className="w-3 h-3 rounded-full bg-green-400 animate-ping" />
                 )}
               </div>
               <span className="text-sm text-white/80">
-                {onlineDevices > 0 ? `Online (${onlineDevices} devices)` : 'No devices nearby'}
+                {!isConnected ? 'Offline' : (onlineDevices > 0 ? `Online (${onlineDevices} devices)` : 'No devices nearby')}
               </span>
             </div>
           </div>

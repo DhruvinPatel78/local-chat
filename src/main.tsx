@@ -9,6 +9,49 @@ if ('serviceWorker' in navigator) {
     navigator.serviceWorker.register('/sw.js')
       .then((registration) => {
         console.log('SW registered: ', registration);
+        
+        // Listen for messages from service worker
+        navigator.serviceWorker.addEventListener('message', (event) => {
+          console.log('Received message from service worker:', event.data);
+          if (event.data && event.data.type === 'APP_STATE_CHANGE') {
+            // Notify the app about state changes
+            window.dispatchEvent(new CustomEvent('appStateChange', {
+              detail: event.data
+            }));
+          }
+        });
+
+        // PWA-specific app close detection
+        const isStandalone = window.matchMedia('(display-mode: standalone)').matches;
+        if (isStandalone) {
+          console.log('PWA detected in standalone mode');
+          
+          // Handle PWA app close
+          window.addEventListener('beforeunload', () => {
+            console.log('PWA app closing detected');
+            // Send message to service worker about app close
+            if (navigator.serviceWorker.controller) {
+              navigator.serviceWorker.controller.postMessage({
+                type: 'PWA_APP_CLOSE',
+                timestamp: Date.now()
+              });
+            }
+          });
+
+          // Handle PWA app going to background
+          document.addEventListener('visibilitychange', () => {
+            if (document.visibilityState === 'hidden') {
+              console.log('PWA app going to background');
+              // Send message to service worker about app background
+              if (navigator.serviceWorker.controller) {
+                navigator.serviceWorker.controller.postMessage({
+                  type: 'PWA_APP_BACKGROUND',
+                  timestamp: Date.now()
+                });
+              }
+            }
+          });
+        }
       })
       .catch((registrationError) => {
         console.log('SW registration failed: ', registrationError);

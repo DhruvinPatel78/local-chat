@@ -1,0 +1,224 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>LocalChat Connection Debug</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            background: #1a1a1a;
+            color: #fff;
+        }
+        .status {
+            padding: 10px;
+            margin: 10px 0;
+            border-radius: 5px;
+        }
+        .connected { background: #2d5a2d; }
+        .disconnected { background: #5a2d2d; }
+        .error { background: #5a2d2d; }
+        .info { background: #2d2d5a; }
+        button {
+            background: #4a90e2;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 5px;
+            cursor: pointer;
+            margin: 5px;
+        }
+        button:hover { background: #357abd; }
+        button:disabled { background: #666; cursor: not-allowed; }
+        #log {
+            background: #000;
+            color: #0f0;
+            padding: 10px;
+            border-radius: 5px;
+            height: 300px;
+            overflow-y: auto;
+            font-family: monospace;
+            font-size: 12px;
+        }
+    </style>
+</head>
+<body>
+    <h1>LocalChat Connection Debug</h1>
+    
+    <div id="status" class="status disconnected">Disconnected</div>
+    
+    <div>
+        <button onclick="connect()">Connect</button>
+        <button onclick="disconnect()">Disconnect</button>
+        <button onclick="sendInit()">Send Init</button>
+        <button onclick="refreshDevices()">Refresh Devices</button>
+        <button onclick="clearLog()">Clear Log</button>
+    </div>
+    
+    <h3>Connection Info:</h3>
+    <div id="info"></div>
+    
+    <h3>Devices:</h3>
+    <div id="devices"></div>
+    
+    <h3>Log:</h3>
+    <div id="log"></div>
+
+    <script>
+        let ws = null;
+        let localUser = null;
+        let devices = [];
+
+        // Load user from localStorage or create new one
+        function loadUser() {
+            const saved = localStorage.getItem('localUser');
+            if (saved) {
+                localUser = JSON.parse(saved);
+            } else {
+                localUser = {
+                    id: Math.random().toString(36).substr(2, 9) + Date.now().toString(36),
+                    name: 'User-' + Math.random().toString(36).substr(2, 4)
+                };
+                localStorage.setItem('localUser', JSON.stringify(localUser));
+            }
+            log('User loaded:', localUser);
+        }
+
+        function log(...args) {
+            const logDiv = document.getElementById('log');
+            const time = new Date().toLocaleTimeString();
+            const message = `[${time}] ${args.map(arg => typeof arg === 'object' ? JSON.stringify(arg) : arg).join(' ')}`;
+            logDiv.innerHTML += message + '<br>';
+            logDiv.scrollTop = logDiv.scrollHeight;
+            console.log(...args);
+        }
+
+        function updateStatus(status, className) {
+            const statusDiv = document.getElementById('status');
+            statusDiv.textContent = status;
+            statusDiv.className = `status ${className}`;
+        }
+
+        function updateInfo() {
+            const infoDiv = document.getElementById('info');
+            infoDiv.innerHTML = `
+                <p><strong>User ID:</strong> ${localUser?.id || 'Not set'}</p>
+                <p><strong>User Name:</strong> ${localUser?.name || 'Not set'}</p>
+                <p><strong>WebSocket State:</strong> ${ws ? ws.readyState : 'null'}</p>
+                <p><strong>Backend URL:</strong> wss://local-chat-be.onrender.com</p>
+            `;
+        }
+
+        function updateDevices() {
+            const devicesDiv = document.getElementById('devices');
+            if (devices.length === 0) {
+                devicesDiv.innerHTML = '<p>No devices online</p>';
+            } else {
+                devicesDiv.innerHTML = devices.map(device => 
+                    `<div>${device.name} (${device.id}) - Online</div>`
+                ).join('');
+            }
+        }
+
+        function connect() {
+            if (ws && ws.readyState === WebSocket.OPEN) {
+                log('Already connected');
+                return;
+            }
+
+            log('Connecting to wss://local-chat-be.onrender.com...');
+            updateStatus('Connecting...', 'info');
+
+            ws = new WebSocket('wss://local-chat-be.onrender.com');
+
+            ws.onopen = () => {
+                log('WebSocket connected!');
+                updateStatus('Connected', 'connected');
+                updateInfo();
+            };
+
+            ws.onmessage = (event) => {
+                const data = JSON.parse(event.data);
+                log('Received:', data);
+                
+                if (data.type === 'online-devices') {
+                    devices = data.devices || [];
+                    log('Devices updated:', devices);
+                    updateDevices();
+                }
+            };
+
+            ws.onclose = (event) => {
+                log('WebSocket closed:', event.code, event.reason);
+                updateStatus('Disconnected', 'disconnected');
+                updateInfo();
+            };
+
+            ws.onerror = (error) => {
+                log('WebSocket error:', error);
+                updateStatus('Error', 'error');
+            };
+        }
+
+        function disconnect() {
+            if (ws) {
+                ws.close();
+                ws = null;
+                log('Disconnected');
+            }
+        }
+
+        function sendInit() {
+            if (!ws || ws.readyState !== WebSocket.OPEN) {
+                log('Cannot send init - not connected');
+                return;
+            }
+            if (!localUser) {
+                log('Cannot send init - no user');
+                return;
+            }
+
+            const initMessage = { 
+                type: 'init', 
+                id: localUser.id, 
+                name: localUser.name 
+            };
+            log('Sending init:', initMessage);
+            ws.send(JSON.stringify(initMessage));
+        }
+
+        function refreshDevices() {
+            if (!ws || ws.readyState !== WebSocket.OPEN) {
+                log('Cannot refresh - not connected');
+                return;
+            }
+            if (!localUser) {
+                log('Cannot refresh - no user');
+                return;
+            }
+
+            const refreshMessage = { 
+                type: 'refresh-devices', 
+                id: localUser.id, 
+                name: localUser.name,
+                timestamp: Date.now()
+            };
+            log('Sending refresh request:', refreshMessage);
+            ws.send(JSON.stringify(refreshMessage));
+        }
+
+        function clearLog() {
+            document.getElementById('log').innerHTML = '';
+        }
+
+        // Initialize
+        loadUser();
+        updateInfo();
+        updateDevices();
+        log('Debug tool initialized');
+    </script>
+</body>
+</html>
