@@ -175,7 +175,7 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
   return (
     <div className="bg-white/10 backdrop-blur-md rounded-none border-none md:rounded-tr-2xl md:border md:border-white/20 flex flex-col h-full">
       {/* Chat Header */}
-      <div className="p-4 border-b border-white/10 flex items-center gap-2 sticky top-0">
+      <div className="p-4 h-[65px] border-b border-white/10 flex items-center gap-2 sticky top-0">
         {onBack && (
           <button
             className="p-1 rounded-full hover:bg-white/20 focus:outline-none"
@@ -274,7 +274,7 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
         <div ref={messagesEndRef} />
       </div>
       {/* Input Area */}
-      <div className="p-4 border-t border-white/10">
+      <div className="p-4 min-h-[75px] border-t border-white/10">
         <div className="flex items-center justify-around gap-2">
           <input
             type="file"
